@@ -1,7 +1,6 @@
-obj-m += chip_i2c.o
-
+obj-m = chip_i2c.o
+KDIR := /home/razor2/dev/bbb/linux2/linux
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-
+	make -C $(KDIR) M=$(shell pwd) modules
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C $(KDIR) M=$(shell pwd) clean
