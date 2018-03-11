@@ -7,7 +7,6 @@
 
 int main()
 {
-	int i;
 	int err = 0;
 
 	double lux;
