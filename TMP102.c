@@ -9,7 +9,7 @@
 #include "i2c_driver.h"
 #include "TMP102.h"
 
-int TMP102_get_temp(int addr, char* interface, uint16_t* value)
+int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value)
 {
     unsigned char bytes[2];
 

@@ -14,7 +14,7 @@
 #define TMP102_CONVRATE_4HZ 0x02 //default
 #define TMP102_CONVRATE_8HZ 0x03
 
-int TMP102_get_temp(int addr, char* interface, uint16_t* value);
+int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value);
 
 #endif
 

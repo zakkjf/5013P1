@@ -10,18 +10,19 @@ int main()
 	int i;
 	int err = 0;
 
-	uint16_t lightval, tempval;
+	uint16_t tempval;
+	double lux;
 	float temp;
 
-	err+=ADPS9301_power_on(0x39,"/dev/i2c-1");
+	err+=APDS9301_power_on(0x39,"/dev/i2c-1");
 
 	for(i=0;i<20;i++)
 	{
-		err+=ADPS9301_get_light(0x39,"/dev/i2c-1", &lightval);
-		err+=TMP102_get_temp(0x48,"/dev/i2c-1", &tempval);
+		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
+		err+=TMP102_get_raw_temp(0x48,"/dev/i2c-1", &tempval);
 
 		temp = ((double)(tempval))/16;
-		printf("Light sensor value %d: %d\n", i, lightval);
+		printf("Light sensor value %d: %.8lf\n", i, lux);
 		printf("Temp sensor value %d: %.4f\n", i, temp);
 		sleep(1);
 	}
