@@ -22,9 +22,9 @@ int main()
 		err+=TMP102_get_temp_f(0x48,"/dev/i2c-1", &tempf);
 
 
-		printf("Light sensor value %d: %.8lf lux\n", i, lux);
-		printf("Temp sensor value %d: %.4f\n degrees Celcius", i, tempc);
-		printf("Temp sensor value %d: %.4f\n degrees Celcius", i, tempf);
+		printf("Light sensor value %d: %.5lf lux\n", i, lux);
+		printf("Temp sensor value %d: %.4f degrees Celcius \n", i, tempc);
+		printf("Temp sensor value %d: %.4f degrees Fahrenheit \n", i, tempf);
 
 		sleep(1);
 	}
