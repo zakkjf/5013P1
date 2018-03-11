@@ -15,7 +15,7 @@ int main()
 
 	err+=APDS9301_power_on(0x39,"/dev/i2c-1");
 
-	for(i=0;i<20;i++)
+	while(1)
 	{
 		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
 		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &tempc);
