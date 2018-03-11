@@ -1,1 +1,0 @@
-cmd_/home/razor2/dev/5013P1/chip_i2c/chip_i2c.ko := arm-linux-gnueabi-ld -EL -r  -T ./scripts/module-common.lds --build-id  -T ./arch/arm/kernel/module.lds -o /home/razor2/dev/5013P1/chip_i2c/chip_i2c.ko /home/razor2/dev/5013P1/chip_i2c/chip_i2c.o /home/razor2/dev/5013P1/chip_i2c/chip_i2c.mod.o

@@ -6,9 +6,11 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include "i2c_driver.h"
 
+#define I2C_0_FILE_NAME "/dev/i2c-0"
+#define I2C_1_FILE_NAME "/dev/i2c-1"
 
-#define I2C_FILE_NAME "/dev/i2c-0"
 #define USAGE_MESSAGE \
     "Usage:\n" \
     "  %s r [addr] [register]   " \
@@ -17,7 +19,24 @@
         "to write a value [value] to register [register]\n" \
     ""
 
-static int set_i2c_register(int file,
+int i2c_open(char* filename) {
+    int i2c_file;
+
+    // Open a connection to the I2C userspace control file.
+    if ((i2c_file = open(filename, O_RDWR)) < 0) {
+        perror("Unable to open i2c control file");
+        return -1;
+    }
+
+    return i2c_file;
+}
+
+int i2c_close(int i2c_file) {
+    // close connection to the I2C userspace control file.
+    return close(i2c_file);
+}
+
+int set_i2c_register(int file,
                             unsigned char addr,
                             unsigned char reg,
                             unsigned char value) {
@@ -53,7 +72,7 @@ static int set_i2c_register(int file,
 }
 
 
-static int get_i2c_register_repstart(int file,
+int get_i2c_register_repstart(int file,
                             unsigned char addr,
                             unsigned char reg,
                             unsigned char *val) {
@@ -85,50 +104,6 @@ static int get_i2c_register_repstart(int file,
         return 1;
     }
     //*val = inbuf;
-
-    return 0;
-}
-
-
-int main(int argc, char **argv) {
-    int i2c_file;
-
-    // Open a connection to the I2C userspace control file.
-    if ((i2c_file = open(I2C_FILE_NAME, O_RDWR)) < 0) {
-        perror("Unable to open i2c control file");
-        exit(1);
-    }
-
-
-    if(argc > 3 && !strcmp(argv[1], "r")) {
-        int addr = strtol(argv[2], NULL, 0);
-        int reg = strtol(argv[3], NULL, 0);
-        unsigned char value;
-        if(get_i2c_register_repstart(i2c_file, addr, reg, &value)) {
-            printf("Unable to get register!\n");
-        }
-        else {
-            printf("Register %d: %d (%x)\n", reg, (int)value, (int)value);
-        }
-    }
-    else if(argc > 4 && !strcmp(argv[1], "w")) {
-        int addr = strtol(argv[2], NULL, 0);
-        int reg = strtol(argv[3], NULL, 0);
-        int value = strtol(argv[4], NULL, 0);
-        if(set_i2c_register(i2c_file, addr, reg, value)) {
-            printf("Unable to get register!\n");
-        }
-        else {
-            printf("Set register %x: %d (%x)\n", reg, value, value);
-        }
-    }
-    else {
-        fprintf(stderr, USAGE_MESSAGE, argv[0], argv[0]);
-    }
-
-
-    close(i2c_file);
-
 
     return 0;
 }
