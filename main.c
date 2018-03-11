@@ -11,17 +11,21 @@ int main()
 	int err = 0;
 
 	double lux;
-	float temp;
+	float tempc, tempf;
 
 	err+=APDS9301_power_on(0x39,"/dev/i2c-1");
 
 	for(i=0;i<20;i++)
 	{
 		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &tempc);
+		err+=TMP102_get_temp_f(0x48,"/dev/i2c-1", &tempf);
 
-		printf("Light sensor value %d: %.8lf\n", i, lux);
-		printf("Temp sensor value %d: %.4f\n", i, temp);
+
+		printf("Light sensor value %d: %.8lf lux\n", i, lux);
+		printf("Temp sensor value %d: %.4f\n degrees Celcius", i, tempc);
+		printf("Temp sensor value %d: %.4f\n degrees Celcius", i, tempf);
+
 		sleep(1);
 	}
 
