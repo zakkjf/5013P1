@@ -9,7 +9,7 @@
 #include "i2c_driver.h"
 #include "TMP102.h"
 
-int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value)
+static int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value)
 {
     unsigned char bytes[2];
 
@@ -24,6 +24,24 @@ int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value)
     return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
 }
 
+int TMP102_get_temp_c(int addr, char* interface, float* value)
+{
+    uint16_t temp_raw;
+    int ret = TMP102_get_raw_temp(addr, interface, &temp_raw);
+
+    *value = ((float)(temp_raw))/16; //divide by 16, as LSB resolution of sensor is (0.0625 = 2^-4 = 1/16) deg C 
+    return ret;
+}
+
+int TMP102_get_temp_f(int addr, char* interface, float* value)
+{
+    float temp_cel;
+    int ret = TMP102_get_temp_c(addr, interface, &temp_cel);
+
+    *value = (temp_cel * 1.8) + 32.0; //conversion from celsius to fahrenheit;
+
+    return ret;
+}
 /*
 //device must be powered on before reading
 int ADPS9301_power_on(int addr, char* interface)

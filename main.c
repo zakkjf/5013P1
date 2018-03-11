@@ -10,7 +10,6 @@ int main()
 	int i;
 	int err = 0;
 
-	uint16_t tempval;
 	double lux;
 	float temp;
 
@@ -19,9 +18,8 @@ int main()
 	for(i=0;i<20;i++)
 	{
 		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-		err+=TMP102_get_raw_temp(0x48,"/dev/i2c-1", &tempval);
+		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
 
-		temp = ((double)(tempval))/16;
 		printf("Light sensor value %d: %.8lf\n", i, lux);
 		printf("Temp sensor value %d: %.4f\n", i, temp);
 		sleep(1);
