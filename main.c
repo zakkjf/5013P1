@@ -16,7 +16,7 @@ int main()
 	for(i=0;i<20;i++)
 	{
 		err+=ADPS9301_get_light(0x39,"/dev/i2c-1", &value);
-		printf("Light sensor value %d: %d", i, value);
+		printf("Light sensor value %d: %d\n", i, value);
 	}
 
 	return 0;
