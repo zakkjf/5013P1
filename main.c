@@ -7,6 +7,7 @@
 
 int main()
 {
+	int i=0;
 	int err = 0;
 
 	double lux;
@@ -16,6 +17,7 @@ int main()
 
 	while(1)
 	{
+		i++; //counter
 		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
 		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &tempc);
 		err+=TMP102_get_temp_f(0x48,"/dev/i2c-1", &tempf);
