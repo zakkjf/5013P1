@@ -26,4 +26,10 @@ int get_i2c_register_repstart(int file,
                             unsigned char reg,
                             unsigned char *val);
 
+int get_i2c_registers(int file,
+                    unsigned char addr,
+                    unsigned char reg,
+                    unsigned char count,
+                    unsigned char *val);
+
 #endif

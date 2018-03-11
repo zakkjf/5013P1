@@ -107,3 +107,39 @@ int get_i2c_register_repstart(int file,
 
     return 0;
 }
+
+int get_i2c_registers(int file,
+                    unsigned char addr,
+                    unsigned char reg,
+                    unsigned char count,
+                    unsigned char *vals) {
+    //unsigned char inbuf, outbuf;
+    struct i2c_rdwr_ioctl_data packets;
+    struct i2c_msg messages[2];
+
+    /*
+     * can read multiple registers here
+     */
+    //outbuf = reg;
+    messages[0].addr  = addr;
+    messages[0].flags = 0;
+    messages[0].len   = 2;//sizeof(outbuf);
+    messages[0].buf   = &reg;
+
+    /* The data will get returned in this structure */
+    messages[1].addr  = addr;
+    messages[1].flags = I2C_M_RD | I2C_M_NOSTART;
+    messages[1].len   = count;//sizeof(inbuf);
+    messages[1].buf   = vals;//&inbuf;
+
+    /* Send the request to the kernel and get the result back */
+    packets.msgs      = messages;
+    packets.nmsgs     = 2;
+    if(ioctl(file, I2C_RDWR, &packets) < 0) {
+        perror("Unable to send data");
+        return 1;
+    }
+    //*val = inbuf;
+
+    return 0;
+}
