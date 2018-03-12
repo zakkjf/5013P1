@@ -56,6 +56,26 @@ pthread_mutex_t th1_mutex;
 pthread_mutex_t th2_mutex;
 
 /**
+​ ​*​ ​@brief​ ​thread-safe message copy
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​dest destination message
+ ​*​ ​@param​ ​src source message
+ ​*​ ​@param​ ​mutex the mutex used
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void* msgcpy( void* dest, const void* src, pthread_mutex_t* mutex)
+{
+	pthread_mutex_lock(mutex);
+	memcpy(dest, src, sizeof(struct msg));
+	pthread_mutex_unlock(mutex);
+	return dest;
+}
+/**
 ​ ​*​ ​@brief​ ​Synchronous encapsulator for printf
 ​ ​*
 ​ ​*​ ​Mutexes printf for asynchronous call protection
@@ -248,16 +268,16 @@ void *thread1_fnt(void* ptr)
 	struct msg *received = malloc(sizeof(struct msg));
     while(1)
     {
-    	pthread_mutex_lock(&th1_mutex);
-		memcpy(received, ptr,sizeof(struct msg));	
+    	//pthread_mutex_lock(&th1_mutex);
+		msgcpy(received, ptr, &th1_mutex);	
 	    if(received->request == ACTIVE)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
 			received->data = "BALLS!";
-			memcpy(ptr,received,sizeof(struct msg));
+			msgcpy(ptr,received,&th1_mutex);
 	    }
-		pthread_mutex_unlock(&th1_mutex);
+		//pthread_mutex_unlock(&th1_mutex);
 		//sleep(1);
     }
    	return NULL;
@@ -279,16 +299,16 @@ void *thread2_fnt(void* ptr)
    	struct msg *received = malloc(sizeof(struct msg));
     while(1)
     {
-    	pthread_mutex_lock(&th2_mutex);
-		memcpy(received, ptr,sizeof(struct msg));
+    	//pthread_mutex_lock(&th2_mutex);
+		msgcpy(received, ptr,&th2_mutex);
 	    if(received->request == ACTIVE)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
 			received->data = "ASS!";
-			memcpy(ptr,received,sizeof(struct msg));
+			msgcpy(ptr,received,&th2_mutex);
 	    }
-		pthread_mutex_unlock(&th2_mutex);
+		//pthread_mutex_unlock(&th2_mutex);
 		//sleep(1);
     }
    	return NULL;
@@ -369,31 +389,27 @@ int main()
     char req1=0, req2=0;
     while(1)
     {
-		memcpy(msg_th1, shmem_th1, sizeof(struct msg));
-		memcpy(msg_th2, shmem_th2, sizeof(struct msg));
+    	msgcpy(msg_th1, shmem_th1, &th1_mutex);
+		msgcpy(msg_th2, shmem_th2, &th2_mutex);
 
 	    if(msg_th1->response==ACTIVE)
 	    {
 	    	sync_printf("Sensor 1: %s\n", msg_th1->data);
-			pthread_mutex_lock(&th1_mutex);
 	    	msg_th1->response = CLEAR;
 	    	msg_th1->request = req1;
 	    	req1 = CLEAR;
-	    	memcpy(shmem_th1, msg_th1, sizeof(struct msg));
-	    	pthread_mutex_unlock(&th1_mutex);
+	    	msgcpy(shmem_th1, msg_th1, &th1_mutex);
 	    }
 	   
 	    if(msg_th2->response==ACTIVE)
 	    {
 	    	sync_printf("Sensor 2: %s\n", msg_th2->data);
-			pthread_mutex_lock(&th2_mutex);
 	    	msg_th2->response = CLEAR;
 	    	msg_th2->request = req2;
-	    	memcpy(shmem_th2, msg_th2, sizeof(struct msg));
-	    	pthread_mutex_unlock(&th2_mutex);
+	    	msgcpy(shmem_th2, msg_th2, &th2_mutex);
 	    }
 
-	    sleep(1);
+	    //sleep(1);
 	    //heartbeat
 	   	req1 = ACTIVE;
 	   	req2 = ACTIVE;
