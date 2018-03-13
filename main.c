@@ -38,18 +38,23 @@
 #include "main.h"
 
 #define DEBUG OFF
+#define SENSOR_OUTPUT ON
 #define LOGPATH "log.txt"
 #define MSG_SIZE_MAX 128
 #define LOG_SIZE_MAX 256
 #define TEMP_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
 #define LIGHT_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
 
-/*DON'T FUCK WITH ANYTHING BELOW THIS LINE*/
+/*DON'T MESS WITH ANYTHING BELOW THIS LINE*/
 /*--------------------------------------------------------------*/
 #define ON 1
 #define OFF 0
 #define ACTIVE ON
 #define CLEAR OFF
+
+#define FAHRENHEIT  'F'
+#define CELSIUS     'C'
+#define KELVIN      'K'
 
 typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
 
@@ -272,11 +277,11 @@ void *thread1_fnt(void* ptr)
     {
     	logcount++;
     	//sprintf(doo, "%d", poo);
+        
         pthread_mutex_lock(&sensor_mutex);
         err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-        //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
         pthread_mutex_unlock(&sensor_mutex);
-
+        //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
     	pthread_mutex_lock(&th1_mutex);
 		msgcpy(received, ptr);	
 	    if(received->request == ACTIVE && received->response==CLEAR)
@@ -288,7 +293,6 @@ void *thread1_fnt(void* ptr)
 			{
 				strcpy(received->data,log_str(LIGHT_THR, 2, "THIS IS ONLY A TEST, DAWG"));
 			}
-	    	//sync_printf("My 1 Counter:%d\n",received->counter);
 			msgcpy(ptr,received);
 	    }
 		pthread_mutex_unlock(&th1_mutex);
@@ -311,7 +315,6 @@ void *thread1_fnt(void* ptr)
 ​ ​*/
 void *thread2_fnt(void* ptr)
 {
-    //
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
@@ -325,7 +328,20 @@ void *thread2_fnt(void* ptr)
     {
     	logcount++;
         pthread_mutex_lock(&sensor_mutex);
-        TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+        switch(received->tempformat)
+        {
+           case CELSIUS:
+              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+              break; 
+           case FAHRENHEIT:
+              TMP102_get_temp_f(0x48,"/dev/i2c-1", &temp);
+              break; 
+           case KELVIN:
+              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+              break;
+           default :
+              temp = -99.99;  //ERROR, INVALID FORMAT
+        }
         pthread_mutex_unlock(&sensor_mutex);
     	//sprintf(doo, "%d", poo);
     	pthread_mutex_lock(&th2_mutex);
@@ -433,6 +449,8 @@ int main()
     msg_th2_write->request = ACTIVE;
     msg_th3_write->request = ACTIVE;
 
+    msg_th2_read->tempformat = CELSIUS;
+
 	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
 	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
 	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
@@ -472,10 +490,13 @@ int main()
 	    	msg_th1_write->response = CLEAR;
 	    	msg_th1_read->response = CLEAR;
 	    	strcpy(logs,msg_th1_read->data);
+            //msg_th1_write->data;
 	    	//sync_printf(logs);
-            sync_printf("Light sensor value %d: %.5lf lux\n", 
-                i,
-                msg_th1_read->sensorvalue);
+            #if SENSOR_OUTPUT == ON
+                sync_printf("Light sensor value %d: %.5lf lux\n", 
+                    i,
+                    msg_th1_read->sensorvalue);
+            #endif
     		i++;
     		msg_th1_write->counter = i;
 	    	msgcpy(shmem_th1, msg_th1_write);
@@ -491,9 +512,12 @@ int main()
 	    	msg_th2_read->response = CLEAR;
 
 	    	strcat(logs,msg_th2_read->data);
-            sync_printf("Temp sensor value %d: %.4f deg C\n", 
-                i,
-                msg_th2_read->sensorvalue);
+            #if SENSOR_OUTPUT == ON
+                sync_printf("Temp sensor value %d: %.4f deg %c\n", 
+                    i,
+                    msg_th2_read->sensorvalue,
+                    msg_th2_read->tempformat);
+            #endif
 	    	//sync_printf(logs);
 	    	//msg_th2_write->request = req2;
 	    	msgcpy(shmem_th2, msg_th2_write);
