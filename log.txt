@@ -12,3 +12,4 @@ Temp Sensor Thread, Level 2, Time: 03/12/2018 21:46:23, Message:THIS IS ALSO A T
 Light Sensor Thread, Level 2, Time: 03/12/2018 21:46:23, Message:THIS IS ONLY A TEST, DAWG
 Light Sensor Thread, Level 2, Time: 03/12/2018 22:53:20, Message:THIS IS ONLY A TEST, DAWG
 Temp Sensor Thread, Level 2, Time: 03/12/2018 22:53:22, Message:THIS IS ALSO A TEST, DAWG
+X\ìDþ

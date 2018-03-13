@@ -449,7 +449,7 @@ int main()
     msg_th2_write->request = ACTIVE;
     msg_th3_write->request = ACTIVE;
 
-    msg_th2_read->tempformat = CELSIUS;
+    msg_th2_write->tempformat = CELSIUS;
 
 	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
 	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
