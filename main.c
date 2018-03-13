@@ -273,6 +273,7 @@ void *thread1_fnt(void* ptr)
     	//sprintf(doo, "%d", poo);
         pthread_mutex_lock(&sensor_mutex);
         err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
+        sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
         pthread_mutex_unlock(&sensor_mutex);
 
     	pthread_mutex_lock(&th1_mutex);
@@ -466,9 +467,9 @@ int main()
 	    	msg_th1_read->response = CLEAR;
 	    	strcpy(logs,msg_th1_read->data);
 	    	//sync_printf(logs);
-            sync_printf("Light sensor value %d: %.5lf lux\n", 
-                i,
-                msg_th1_read->sensorvalue);
+            //sync_printf("Light sensor value %d: %.5lf lux\n", 
+            //    i,
+             //   msg_th1_read->sensorvalue);
     		i++;
     		msg_th1_write->counter = i;
 	    	msgcpy(shmem_th1, msg_th1_write);
