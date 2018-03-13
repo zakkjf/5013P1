@@ -266,6 +266,7 @@ void *thread1_fnt(void* ptr)
 	 //char doo[5];
 	int logcount=0;
     int err = 0;
+    err+=APDS9301_power_on(0x39,"/dev/i2c-1");
     double lux;
     while(1)
     {
