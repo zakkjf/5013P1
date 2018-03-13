@@ -56,7 +56,7 @@ struct msg{
 	char getsensor;
 	char close;
 	char data[512];
-	char tempformat;
+	char format;
 	double sensorvalue;
 	int counter;
 };

@@ -40,10 +40,15 @@
 #define DEBUG OFF
 #define SENSOR_OUTPUT ON
 #define LOGPATH "log.txt"
+
 #define MSG_SIZE_MAX 128
 #define LOG_SIZE_MAX 256
+
 #define TEMP_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
 #define LIGHT_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+
+#define DEFAULT_LIGHTFORMAT FAKE
+#define DEFAULT_TEMPFORMAT FAKE
 
 /*DON'T MESS WITH ANYTHING BELOW THIS LINE*/
 /*--------------------------------------------------------------*/
@@ -53,12 +58,20 @@
 #define CLEAR OFF
 
 #define FAHRENHEIT  'F'
+#define FAKE        'U'
 #define CELSIUS     'C'
 #define KELVIN      'K'
+
+#define LUMEN       'L'
+
+#define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
+#define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
 
 typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
 
 FILE *fp;
+
+int halt;
 
 pthread_t thread1;
 pthread_t thread2;
@@ -127,26 +140,7 @@ void sync_printf(const char *format, ...)
 ​ ​*/
 void sig_handler(int sig)
 {
-
-    if (sig == SIGUSR1)
-    {
-        //exit threads. Cannot distinguish between threads when force-sending signals
-        
-        //thread-specific handling in thread_join component of main
-        pthread_cancel(thread1);
-        pthread_cancel(thread2);
-    }
-
-    if (sig == SIGUSR2)
-    {
-        //exit threads. Cannot distinguish between threads when force-sending signals
-        
-        //thread-specific handling in thread_join component of main
-        pthread_cancel(thread1);
-        pthread_cancel(thread2);
-    }
-
-
+    halt = ACTIVE;
 }
 
 char* log_str(source_t source, int level, char* msg)
@@ -265,22 +259,35 @@ void *thread1_fnt(void* ptr)
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
+	tim.tv_nsec = LIGHT_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
 	//char poo;
 	//poo = 0;
 	 //char doo[5];
 	int logcount=0;
     int err = 0;
-    err+=APDS9301_power_on(0x39,"/dev/i2c-1");
     double lux;
     while(1)
     {
     	logcount++;
     	//sprintf(doo, "%d", poo);
         
-        pthread_mutex_lock(&sensor_mutex);
-        err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-        pthread_mutex_unlock(&sensor_mutex);
+        
+        if(received->format==LUMEN)
+        {
+            pthread_mutex_lock(&sensor_mutex);
+            if(logcount==1) err+=APDS9301_power_on(0x39,"/dev/i2c-1"); //only power on on the first loop
+            err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux); //only light format
+            pthread_mutex_unlock(&sensor_mutex);
+        }
+        else if(received->format==FAKE)
+        {
+            lux = logcount%20; //fake some really rapidly changing lux data
+        }
+        else
+        {
+            lux = -99.99; //ERROR - INVALID SENSOR FORMAT
+        }
+
         //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
     	pthread_mutex_lock(&th1_mutex);
 		msgcpy(received, ptr);	
@@ -291,11 +298,21 @@ void *thread1_fnt(void* ptr)
 			received->request = CLEAR;
 			if(logcount%LIGHT_LOGGING_INTERVAL==0)
 			{
-				strcpy(received->data,log_str(LIGHT_THR, 2, "THIS IS ONLY A TEST, DAWG"));
+                char logbuf[MSG_SIZE_MAX];
+                sprintf(logbuf,"Sensor value: %.5lf lux %c\n",lux, received->format);
+				strcpy(received->data,log_str(LIGHT_THR, 2, logbuf));
 			}
 			msgcpy(ptr,received);
 	    }
 		pthread_mutex_unlock(&th1_mutex);
+
+        if(received->close == ACTIVE) //recieved close command
+        {
+            free(received);
+            //sync_printf("exiting");
+            pthread_exit(NULL);
+            return NULL;
+        }
 		nanosleep(&tim, NULL);
     }
 
@@ -318,17 +335,17 @@ void *thread2_fnt(void* ptr)
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
+	tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
 	//char poo;
 	//poo = 0;
 	 //char doo[5];
 	int logcount=0;
     float temp;
-    while(1)
+    while(!halt)
     {
     	logcount++;
         pthread_mutex_lock(&sensor_mutex);
-        switch(received->tempformat)
+        switch(received->format)
         {
            case CELSIUS:
               TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
@@ -337,7 +354,10 @@ void *thread2_fnt(void* ptr)
               TMP102_get_temp_f(0x48,"/dev/i2c-1", &temp);
               break; 
            case KELVIN:
-              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp); //TODO - implement Kelvin
+              break;
+           case FAKE:
+              temp = logcount%150-25; //fake some *really* rapidly changing temperatures for testing
               break;
            default :
               temp = -99.99;  //ERROR, INVALID FORMAT
@@ -354,12 +374,22 @@ void *thread2_fnt(void* ptr)
             received->sensorvalue = temp;
 			if(logcount%TEMP_LOGGING_INTERVAL==0)
 			{
-				strcpy(received->data,log_str(TEMP_THR, 2, "THIS IS ALSO A TEST, DAWG"));
+                char logbuf[MSG_SIZE_MAX];
+                sprintf(logbuf,"Sensor value: %.4lf deg %c\n",temp,received->format);
+				strcpy(received->data,log_str(TEMP_THR, 2, logbuf));
 			}
 	    	//sync_printf("My 1 Counter:%d\n",received->counter);
 			msgcpy(ptr,received);
 	    }
 		pthread_mutex_unlock(&th2_mutex);
+
+        if(received->close == ACTIVE)//recieved close command
+        {
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
+
 		nanosleep(&tim, NULL);
     }
     free(received);
@@ -397,7 +427,15 @@ void *thread3_fnt(void* ptr)
 			msgcpy(ptr,received);
 	    }
 		pthread_mutex_unlock(&th3_mutex);
+
+        if(received->close == ACTIVE)
+        { //recieved close command
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
 		nanosleep(&tim, NULL);
+
     }
 	free(received);
    	return NULL;
@@ -416,10 +454,10 @@ int main()
 {
     //attach signal handlers
     if (signal(SIGUSR1, sig_handler) == SIG_ERR)
-    sync_printf("Error: Can't catch SIGUSR1\n");
+        sync_printf("Error: Can't catch SIGUSR1\n");
+    siginterrupt(SIGUSR1, 0);
 
-    if (signal(SIGUSR2, sig_handler) == SIG_ERR)
-    sync_printf("Error: Can't catch SIGUSR2\n");
+
 
     //initialize mutexes for logging and printing
     pthread_mutex_init(&printf_mutex, NULL);
@@ -449,8 +487,10 @@ int main()
     msg_th2_write->request = ACTIVE;
     msg_th3_write->request = ACTIVE;
 
-    msg_th2_write->tempformat = CELSIUS;
+    msg_th1_write->format = DEFAULT_LIGHTFORMAT;
+    msg_th2_write->format = DEFAULT_TEMPFORMAT;
 
+    //initial write out to thread shared memory
 	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
 	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
 	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
@@ -480,25 +520,31 @@ int main()
     int i=0;
 
     char logs[5*LOG_SIZE_MAX];
-    while(1)
+    int close = 0; //DO NOT TOUCH THIS VARIABLE. MODIFY HALT INSTEAD;
+    while(!close)
     {
+        i++; //increment the loop counter
+
+        if(halt==ACTIVE)
+        {
+            close = ACTIVE;
+            msg_th1_write->close = ACTIVE;
+            msg_th2_write->close = ACTIVE;
+            msg_th3_write->close = ACTIVE;
+        }
+
     	pthread_mutex_lock(&th1_mutex);
 		msgcpy(msg_th1_read, shmem_th1);
 	    if(msg_th1_read->response==ACTIVE)
 	    {
-	    	//sync_printf("Sensor 1: %s\n", msg_th1_read->data);
 	    	msg_th1_write->response = CLEAR;
 	    	msg_th1_read->response = CLEAR;
 	    	strcpy(logs,msg_th1_read->data);
-            //msg_th1_write->data;
-	    	//sync_printf(logs);
             #if SENSOR_OUTPUT == ON
                 sync_printf("Light sensor value %d: %.5lf lux\n", 
                     i,
                     msg_th1_read->sensorvalue);
             #endif
-    		i++;
-    		msg_th1_write->counter = i;
 	    	msgcpy(shmem_th1, msg_th1_write);
 	    }
 	    pthread_mutex_unlock(&th1_mutex);
@@ -507,7 +553,6 @@ int main()
 	   	msgcpy(msg_th2_read, shmem_th2);
 	    if(msg_th2_read->response==ACTIVE && msg_th1_read->request==CLEAR)
 	    {
-	    	//sync_printf("Sensor 2: %s\n", msg_th2_read->data);
 	    	msg_th2_write->response = CLEAR;
 	    	msg_th2_read->response = CLEAR;
 
@@ -516,10 +561,8 @@ int main()
                 sync_printf("Temp sensor value %d: %.4f deg %c\n", 
                     i,
                     msg_th2_read->sensorvalue,
-                    msg_th2_read->tempformat);
+                    msg_th2_read->format);
             #endif
-	    	//sync_printf(logs);
-	    	//msg_th2_write->request = req2;
 	    	msgcpy(shmem_th2, msg_th2_write);
 	    }
 	    pthread_mutex_unlock(&th2_mutex);
@@ -528,51 +571,29 @@ int main()
 	   	msgcpy(msg_th3_read, shmem_th3);
 	    if(msg_th3_read->response==ACTIVE && msg_th3_read->request==CLEAR)
 	    {
-	    	//sync_printf("Sensor 2: %s\n", msg_th2_read->data);
 	    	msg_th3_write->response = CLEAR;
 	    	msg_th3_read->response = CLEAR;
 	    	strcpy(msg_th3_write->data,logs);
-	    	//sync_printf(logs);
 	    	msgcpy(shmem_th3, msg_th3_write);
 	    }
 	    pthread_mutex_unlock(&th3_mutex);
-
+       // halt=1;
 	}
-    /* wait for the second thread to finish */
+
+
     if(pthread_join(thread1, NULL)) {
-
-        
-        return 2;
-
-    }
-    else
-    {
-        
-        
+        //pthread_mutex_unlock(&th1_mutex);
+       // sync_printf("Light Sensor Thread Exited Safely");
     }
 
     if(pthread_join(thread2, NULL)) {
-
-        
-        return 2;
-
-    }
-    else
-    {
-        
-        
+       // pthread_mutex_unlock(&th2_mutex);
+       // sync_printf("Temp Sensor Thread Exited Safely");
     }
 
     if(pthread_join(thread3, NULL)) {
-
-        
-        return 2;
-
-    }
-    else
-    {
-        
-        
+        //pthread_mutex_unlock(&th3_mutex);
+        //sync_printf("Logger Thread Exited Safely");
     }
 
     free(msg_th1_write);
@@ -585,6 +606,10 @@ int main()
     munmap(shmem_th1, sizeof(struct msg));
     munmap(shmem_th2, sizeof(struct msg));
     munmap(shmem_th3, sizeof(struct msg));
+
+    sync_printf("Main Thread Exited Safely");
+
+    system("pause");
 
     return 0;
 }
