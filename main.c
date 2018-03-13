@@ -273,7 +273,7 @@ void *thread1_fnt(void* ptr)
     	//sprintf(doo, "%d", poo);
         pthread_mutex_lock(&sensor_mutex);
         err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-        pthread_mutex_lock(&sensor_mutex);
+        pthread_mutex_unlock(&sensor_mutex);
 
     	pthread_mutex_lock(&th1_mutex);
 		msgcpy(received, ptr);	
