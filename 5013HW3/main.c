@@ -35,18 +35,20 @@
 #include <sys/mman.h>
 #include "main.h"
 
-#define _GNU_SOURCE
-#define FILEPATH "log.txt"
-#define FILEPATH2 "random.txt"
-#define FILEPATH3 "/proc/stat"
-
-#define ACTIVE 1
-#define CLEAR  0
-
+#define DEBUG OFF
+#define LOGPATH "log.txt"
 #define MSG_SIZE_MAX 128
 #define LOG_SIZE_MAX 256
-#define TEMP_LOGGING_INTERVAL 500 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
-#define LIGHT_LOGGING_INTERVAL 5000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+#define TEMP_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+#define LIGHT_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+
+/*DON'T FUCK WITH ANYTHING BELOW THIS LINE*/
+/*--------------------------------------------------------------*/
+#define ON 1
+#define OFF 0
+#define ACTIVE ON
+#define CLEAR OFF
+
 typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
 
 FILE *fp;
@@ -57,7 +59,6 @@ pthread_t thread3;
 
 pthread_mutex_t printf_mutex;
 pthread_mutex_t log_mutex;
-pthread_mutex_t logger_mutex;
 pthread_mutex_t sensor_mutex;
 pthread_mutex_t th1_mutex;
 pthread_mutex_t th2_mutex;
@@ -123,7 +124,7 @@ void sig_handler(int sig)
     if (sig == SIGUSR1)
     {
         //exit threads. Cannot distinguish between threads when force-sending signals
-        //sync_logwrite(FILEPATH,"All Threads", "Received SIGUSR1");
+        
         //thread-specific handling in thread_join component of main
         pthread_cancel(thread1);
         pthread_cancel(thread2);
@@ -132,7 +133,7 @@ void sig_handler(int sig)
     if (sig == SIGUSR2)
     {
         //exit threads. Cannot distinguish between threads when force-sending signals
-        //sync_logwrite(FILEPATH,"All Threads", "Received SIGUSR2");
+        
         //thread-specific handling in thread_join component of main
         pthread_cancel(thread1);
         pthread_cancel(thread2);
@@ -141,7 +142,6 @@ void sig_handler(int sig)
 
 }
 
-//max message 25 characters
 char* log_str(source_t source, int level, char* msg)
 {
 	char* buffer = malloc(sizeof(char)*MSG_SIZE_MAX);
@@ -224,16 +224,14 @@ int sync_log_id(char* filename, char* thread)
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-int sync_logwrite(char* filename, char* thread, char* log)
+int sync_logwrite(char* filename,char* log)
 {
     pthread_mutex_lock(&log_mutex);
 
 	fp = fopen (filename, "a");
 
-	fprintf(fp,"%s", thread);
-	fprintf(fp,"%s", " : ");
 	fprintf(fp,"%s", log);
-	fprintf(fp,"%s", "\n");
+
 	//Flush file output
 	fflush(fp);
 
@@ -256,7 +254,7 @@ int sync_logwrite(char* filename, char* thread, char* log)
 ​ ​*/
 void *thread1_fnt(void* ptr)
 {
-    ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
+    //
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
@@ -286,6 +284,8 @@ void *thread1_fnt(void* ptr)
 		pthread_mutex_unlock(&th1_mutex);
 		nanosleep(&tim, NULL);
     }
+
+    free(received);
    	return NULL;
 }
 
@@ -301,7 +301,7 @@ void *thread1_fnt(void* ptr)
 ​ ​*/
 void *thread2_fnt(void* ptr)
 {
-    ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
+    //
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
@@ -331,6 +331,7 @@ void *thread2_fnt(void* ptr)
 		pthread_mutex_unlock(&th2_mutex);
 		nanosleep(&tim, NULL);
     }
+    free(received);
    	return NULL;
 }
 
@@ -345,7 +346,7 @@ void *thread2_fnt(void* ptr)
 ​ ​*/
 void *thread3_fnt(void* ptr)
 {
-     ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
+     //
 	struct msg *received = malloc(sizeof(struct msg));
 	struct timespec tim;
 	tim.tv_sec = 0;
@@ -358,12 +359,16 @@ void *thread3_fnt(void* ptr)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
-			sync_printf(received->data);//print the logs
+			#if DEBUG == ACTIVE
+			sync_printf(received->data);//print the logs to terminal
+			#endif
+			sync_logwrite(LOGPATH,received->data);
 			msgcpy(ptr,received);
 	    }
 		pthread_mutex_unlock(&th3_mutex);
 		nanosleep(&tim, NULL);
     }
+	free(received);
    	return NULL;
 }
 /**
@@ -388,7 +393,6 @@ int main()
     //initialize mutexes for logging and printing
     pthread_mutex_init(&printf_mutex, NULL);
     pthread_mutex_init(&log_mutex, NULL);
-    pthread_mutex_init(&logger_mutex, NULL);
     pthread_mutex_init(&sensor_mutex, NULL);
     pthread_mutex_init(&th1_mutex, NULL);
     pthread_mutex_init(&th2_mutex, NULL);
@@ -401,6 +405,7 @@ int main()
     struct msg *msg_th1_write= malloc(sizeof(struct msg));
  	struct msg *msg_th2_write= malloc(sizeof(struct msg));
  	struct msg *msg_th3_write= malloc(sizeof(struct msg));
+
     struct msg *msg_th1_read= malloc(sizeof(struct msg));
  	struct msg *msg_th2_read= malloc(sizeof(struct msg));
  	struct msg *msg_th3_read= malloc(sizeof(struct msg));
@@ -408,6 +413,7 @@ int main()
     msg_th1_read->response = CLEAR;
     msg_th2_read->response = CLEAR;
     msg_th3_read->response = CLEAR;
+
     msg_th1_write->request = ACTIVE;
     msg_th2_write->request = ACTIVE;
     msg_th3_write->request = ACTIVE;
@@ -491,39 +497,47 @@ int main()
     /* wait for the second thread to finish */
     if(pthread_join(thread1, NULL)) {
 
-        //sync_logwrite(nfo->logfile,"Thread 1","Joining error");
+        
         return 2;
 
     }
     else
     {
-        //sync_logwrite(nfo->logfile,"Thread 1","Exiting");
-        //sync_timetag(nfo->logfile,"Thread 1 End");
+        
+        
     }
 
     if(pthread_join(thread2, NULL)) {
 
-        //sync_logwrite(nfo->logfile,"Thread 2","Joining error");
+        
         return 2;
 
     }
     else
     {
-        //sync_logwrite(nfo->logfile,"Thread 2","Exiting");
-        //sync_timetag(nfo->logfile,"Thread 2 End");
+        
+        
     }
 
     if(pthread_join(thread3, NULL)) {
 
-        //sync_logwrite(nfo->logfile,"Thread 2","Joining error");
+        
         return 2;
 
     }
     else
     {
-        //sync_logwrite(nfo->logfile,"Thread 2","Exiting");
-        //sync_timetag(nfo->logfile,"Thread 2 End");
+        
+        
     }
+
+    free(msg_th1_write);
+ 	free(msg_th2_write);
+ 	free(msg_th3_write);
+    free(msg_th1_read);
+ 	free(msg_th2_read);
+ 	free(msg_th3_read);
+
     munmap(shmem_th1, sizeof(struct msg));
     munmap(shmem_th2, sizeof(struct msg));
     munmap(shmem_th3, sizeof(struct msg));

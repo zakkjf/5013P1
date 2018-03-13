@@ -135,7 +135,7 @@ int sync_log_id(char* filename, char* thread);
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-int sync_logwrite(char* filename, char* thread, char* log);
+int sync_logwrite(char* filename, char* log);
 
 /**
 ​ ​*​ ​@brief​ ​child thread 1
