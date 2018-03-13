@@ -55,7 +55,8 @@ struct msg{
 	char error;
 	char getsensor;
 	char close;
-	char * data;
+	char data[512];
+	int counter;
 };
 
 struct megadata{

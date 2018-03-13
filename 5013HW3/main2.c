@@ -43,17 +43,10 @@
 #define ACTIVE 1
 #define CLEAR  0
 
-#define MSG_SIZE_MAX 128
-#define LOG_SIZE_MAX 256
-#define TEMP_LOGGING_INTERVAL 500 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
-#define LIGHT_LOGGING_INTERVAL 5000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
-typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
-
 FILE *fp;
 
 pthread_t thread1;
 pthread_t thread2;
-pthread_t thread3;
 
 pthread_mutex_t printf_mutex;
 pthread_mutex_t log_mutex;
@@ -61,8 +54,6 @@ pthread_mutex_t logger_mutex;
 pthread_mutex_t sensor_mutex;
 pthread_mutex_t th1_mutex;
 pthread_mutex_t th2_mutex;
-pthread_mutex_t th3_mutex;
-pthread_mutex_t cpy_mutex;
 
 /**
 ​ ​*​ ​@brief​ ​thread-safe message copy
@@ -77,11 +68,11 @@ pthread_mutex_t cpy_mutex;
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-void* msgcpy( void* dest, const void* src)
+void* msgcpy( void* dest, const void* src, pthread_mutex_t* mutex)
 {
-	pthread_mutex_lock(&cpy_mutex);
+	pthread_mutex_lock(mutex);
 	memcpy(dest, src, sizeof(struct msg));
-	pthread_mutex_unlock(&cpy_mutex);
+	pthread_mutex_unlock(mutex);
 	return dest;
 }
 /**
@@ -141,45 +132,62 @@ void sig_handler(int sig)
 
 }
 
-//max message 25 characters
-char* log_str(source_t source, int level, char* msg)
+/**
+​ ​*​ ​@brief​ ​Synchronous time-tagging function
+​ ​*
+​ ​*​ ​Synchronously prints a timestamp to the console
+​ ​*
+​ ​*​ ​@param​ msg message to accompany timestamp
+​ ​*​ ​@return​ void
+​ ​*/
+int sync_timetag(char * filename, char * msg)
 {
-	char* buffer = malloc(sizeof(char)*MSG_SIZE_MAX);
     time_t timer;
-    char timebuf[25];
+    char buffer[25];
     struct tm* time_inf;
 
     time(&timer);
 
     time_inf = localtime(&timer);
-    strftime(timebuf, 25, "%m/%d/%Y %H:%M:%S", time_inf);
+    strftime(buffer, 25, "%m/%d/%Y %H:%M:%S", time_inf);
+    sync_printf(msg);
+    //sync_logwrite(filename,msg,buffer);
+    sync_printf(": ");
+    sync_printf(buffer);
+    sync_printf("\n");
+    return 0;
+}
 
-    char* name;
-	switch(source)
-	{
-	   case LIGHT_THR  :
-	      name = "Light Sensor Thread";
-	      break; 
-	   case TEMP_THR  :
-	      name = "Temp Sensor Thread";
-	      break; 
-	   case SOCKET_THR :
-	      name = "Socket Thread";
-	      break; 
-	   case MASTER_THR  :
-	      name = "Master Thread";
-	      break; 
-   	   default :
-	      name = "Other";
-	}
+/**
+​ ​*​ ​@brief​ Tracks alphanumeric characters into counting bins
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ch char to track
+ * @param arr storage structure for counted bins
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int chartrack(char ch, int * arr)
+{
+    if(ch>96 && ch<123)
+    {
+        ch=ch-32;
+    }
 
-    sprintf(buffer, "%s, Level %d, Time: %s, Message:%s\n",
-    		name,
-    		level,
-    		timebuf,
-    		msg);
-
-    return buffer;
+    if(ch>64 && ch<91)
+    {
+        //incrememnt the correct bin
+        (*(arr+(ch-65)))++;
+        ch=ch-65;
+        //sync_printf("%d\n", ch);
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
 
 /**
@@ -258,33 +266,20 @@ void *thread1_fnt(void* ptr)
 {
     ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
 	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
-	//char poo;
-	//poo = 0;
-	 //char doo[5];
-	int logcount=0;
     while(1)
     {
-    	logcount++;
-    	//sprintf(doo, "%d", poo);
-    	pthread_mutex_lock(&th1_mutex);
-    	//poo++;
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
+    	//pthread_mutex_lock(&th1_mutex);
+		msgcpy(received, ptr, &th1_mutex);	
+	    if(received->request == ACTIVE)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
-			if(logcount%LIGHT_LOGGING_INTERVAL==0)
-			{
-				strcpy(received->data,log_str(LIGHT_THR, 2, "THIS IS ONLY A TEST, DAWG"));
-			}
-	    	//sync_printf("My 1 Counter:%d\n",received->counter);
-			msgcpy(ptr,received);
+			received->data = "BALLS!";
+			sync_printf("My Counter:%d\n",received->counter);
+			msgcpy(ptr,received,&th1_mutex);
 	    }
-		pthread_mutex_unlock(&th1_mutex);
-		nanosleep(&tim, NULL);
+		//pthread_mutex_unlock(&th1_mutex);
+		//sleep(1);
     }
    	return NULL;
 }
@@ -301,71 +296,26 @@ void *thread1_fnt(void* ptr)
 ​ ​*/
 void *thread2_fnt(void* ptr)
 {
-    ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
-	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
-	//char poo;
-	//poo = 0;
-	 //char doo[5];
-	int logcount=0;
+    ////sync_logwrite(nfo->logfile,"Thread 2","Thread 2 Enter");
+   	struct msg *received = malloc(sizeof(struct msg));
     while(1)
     {
-    	logcount++;
-    	//sprintf(doo, "%d", poo);
-    	pthread_mutex_lock(&th2_mutex);
-    	//poo++;
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
+    	//pthread_mutex_lock(&th2_mutex);
+		msgcpy(received, ptr,&th2_mutex);
+	    if(received->request == ACTIVE)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
-			if(logcount%TEMP_LOGGING_INTERVAL==0)
-			{
-				strcpy(received->data,log_str(TEMP_THR, 2, "THIS IS ALSO A TEST, DAWG"));
-			}
-	    	//sync_printf("My 1 Counter:%d\n",received->counter);
-			msgcpy(ptr,received);
+			received->data = "ASS!";
+			received->error = 9;
+			msgcpy(ptr,received,&th2_mutex);
 	    }
-		pthread_mutex_unlock(&th2_mutex);
-		nanosleep(&tim, NULL);
+		//pthread_mutex_unlock(&th2_mutex);
+		//sleep(1);
     }
    	return NULL;
 }
 
-/**
-​ ​*​ ​@brief​ ​child thread 3: logger
-​ ​*
-​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
-​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
-​ *
-​ ​*​ ​@return​ void
-​ ​*/
-void *thread3_fnt(void* ptr)
-{
-     ////sync_logwrite(nfo->logfile,"Thread 1","Thread 1 Enter");
-	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
-    while(1)
-    {
-    	pthread_mutex_lock(&th3_mutex);
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
-	    {
-			received->response = ACTIVE;
-			received->request = CLEAR;
-			sync_printf(received->data);//print the logs
-			msgcpy(ptr,received);
-	    }
-		pthread_mutex_unlock(&th3_mutex);
-		nanosleep(&tim, NULL);
-    }
-   	return NULL;
-}
 /**
 ​ ​*​ ​@brief​ main
 ​ ​*
@@ -392,101 +342,83 @@ int main()
     pthread_mutex_init(&sensor_mutex, NULL);
     pthread_mutex_init(&th1_mutex, NULL);
     pthread_mutex_init(&th2_mutex, NULL);
-    pthread_mutex_init(&th3_mutex, NULL);
 
+    //create and assign info struct to pass into threads
+	struct info *nfo = (struct info*) malloc(sizeof(struct info));
+
+	nfo->infile = FILEPATH2;
+	nfo->logfile = FILEPATH;
+	nfo->procstat= FILEPATH3;
+
+    //sync_logwrite(nfo->logfile,"Thread Main","Thread Main");
+    //sync_log_id(nfo->logfile,"Thread Main");
+    //sync_timetag(nfo->logfile,"Thread Main Start");
+    
     void* shmem_th1 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
     void* shmem_th2 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    void* shmem_th3 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
 
     struct msg *msg_th1_write= malloc(sizeof(struct msg));
  	struct msg *msg_th2_write= malloc(sizeof(struct msg));
- 	struct msg *msg_th3_write= malloc(sizeof(struct msg));
+ 
     struct msg *msg_th1_read= malloc(sizeof(struct msg));
  	struct msg *msg_th2_read= malloc(sizeof(struct msg));
- 	struct msg *msg_th3_read= malloc(sizeof(struct msg));
 
     msg_th1_read->response = CLEAR;
     msg_th2_read->response = CLEAR;
-    msg_th3_read->response = CLEAR;
     msg_th1_write->request = ACTIVE;
     msg_th2_write->request = ACTIVE;
-    msg_th3_write->request = ACTIVE;
 
 	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
 	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
-	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
 
+    //struct msg *rx = malloc(sizeof(struct msg));
     /* create a first thread which executes thread1_fnt(&x) */
-
+    //sync_timetag(nfo->logfile,"Thread 1 Start");
+    sync_printf("Got here\n");
     if(pthread_create(&thread1, NULL, (void *)thread1_fnt, shmem_th1)) {
 
         fprintf(stderr, "Error creating Thread 1\n");
         return 1;
-    }
 
-    /* create a second thread which executes thread2_fnt(&x) */
+    }
+        /* create a second thread which executes thread2_fnt(&x) */
+    //sync_timetag(nfo->logfile,"Thread 2 Start");
    	if(pthread_create(&thread2, NULL, (void *)thread2_fnt, shmem_th2)) {
 
         fprintf(stderr, "Error creating Thread 2\n");
         return 1;
+
     }
-
-        /* create a second thread which executes thread2_fnt(&x) */
-   	if(pthread_create(&thread3, NULL, (void *)thread3_fnt, shmem_th3)) {
-
-        fprintf(stderr, "Error creating Thread 3\n");
-        return 1;
-    }
-
+    //char req1=0, req2=0;
     int i=0;
-
-    char logs[5*LOG_SIZE_MAX];
     while(1)
     {
-    	pthread_mutex_lock(&th1_mutex);
-		msgcpy(msg_th1_read, shmem_th1);
+    	i++;
+    	msgcpy(msg_th1_read, shmem_th1, &th1_mutex);
+		msgcpy(msg_th2_read, shmem_th2, &th2_mutex);
+
 	    if(msg_th1_read->response==ACTIVE)
 	    {
 	    	//sync_printf("Sensor 1: %s\n", msg_th1_read->data);
 	    	msg_th1_write->response = CLEAR;
-	    	msg_th1_read->response = CLEAR;
-	    	strcpy(logs,msg_th1_read->data);
-	    	//sync_printf(logs);
 	    	//msg_th1_write->request = req1;
-    		i++;
-    		msg_th1_write->counter = i;
-	    	msgcpy(shmem_th1, msg_th1_write);
+	    	msgcpy(shmem_th1, msg_th1_write, &th1_mutex);
 	    }
-	    pthread_mutex_unlock(&th1_mutex);
-
-    	pthread_mutex_lock(&th2_mutex);
-	   	msgcpy(msg_th2_read, shmem_th2);
-	    if(msg_th2_read->response==ACTIVE && msg_th1_read->request==CLEAR)
+	   
+	    if(msg_th2_read->response==ACTIVE)
 	    {
 	    	//sync_printf("Sensor 2: %s\n", msg_th2_read->data);
 	    	msg_th2_write->response = CLEAR;
-	    	msg_th2_read->response = CLEAR;
-
-	    	strcat(logs,msg_th2_read->data);
-	    	//sync_printf(logs);
 	    	//msg_th2_write->request = req2;
-	    	msgcpy(shmem_th2, msg_th2_write);
+	    	msgcpy(shmem_th2, msg_th2_write, &th2_mutex);
 	    }
-	    pthread_mutex_unlock(&th2_mutex);
 
-    	pthread_mutex_lock(&th3_mutex);
-	   	msgcpy(msg_th3_read, shmem_th3);
-	    if(msg_th3_read->response==ACTIVE && msg_th3_read->request==CLEAR)
-	    {
-	    	//sync_printf("Sensor 2: %s\n", msg_th2_read->data);
-	    	msg_th3_write->response = CLEAR;
-	    	msg_th3_read->response = CLEAR;
-	    	strcpy(msg_th3_write->data,logs);
-	    	//sync_printf(logs);
-	    	msgcpy(shmem_th3, msg_th3_write);
-	    }
-	    pthread_mutex_unlock(&th3_mutex);
-
+	    sleep(1);
+	    //heartbeat
+	   // msg_th1_write->request = CLEAR;
+	    msg_th1_write->counter = i;
+	   	//req1 = ACTIVE;
+	   	//req2 = ACTIVE;
 	}
     /* wait for the second thread to finish */
     if(pthread_join(thread1, NULL)) {
@@ -512,21 +444,10 @@ int main()
         //sync_logwrite(nfo->logfile,"Thread 2","Exiting");
         //sync_timetag(nfo->logfile,"Thread 2 End");
     }
-
-    if(pthread_join(thread3, NULL)) {
-
-        //sync_logwrite(nfo->logfile,"Thread 2","Joining error");
-        return 2;
-
-    }
-    else
-    {
-        //sync_logwrite(nfo->logfile,"Thread 2","Exiting");
-        //sync_timetag(nfo->logfile,"Thread 2 End");
-    }
     munmap(shmem_th1, sizeof(struct msg));
     munmap(shmem_th2, sizeof(struct msg));
-    munmap(shmem_th3, sizeof(struct msg));
-
+    //sync_logwrite(nfo->logfile,"Thread Main","Exiting");
+    //sync_timetag(nfo->logfile,"Thread Main End");
+    free(nfo); //free nfo struct memory
     return 0;
 }
