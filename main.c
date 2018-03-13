@@ -274,7 +274,7 @@ void *thread1_fnt(void* ptr)
     	//sprintf(doo, "%d", poo);
         pthread_mutex_lock(&sensor_mutex);
         err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
-        sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
+        //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
         pthread_mutex_unlock(&sensor_mutex);
 
     	pthread_mutex_lock(&th1_mutex);
@@ -320,9 +320,13 @@ void *thread2_fnt(void* ptr)
 	//poo = 0;
 	 //char doo[5];
 	int logcount=0;
+    float temp;
     while(1)
     {
     	logcount++;
+        pthread_mutex_lock(&sensor_mutex);
+        TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+        pthread_mutex_unlock(&sensor_mutex);
     	//sprintf(doo, "%d", poo);
     	pthread_mutex_lock(&th2_mutex);
     	//poo++;
@@ -331,6 +335,7 @@ void *thread2_fnt(void* ptr)
 	    {
 			received->response = ACTIVE;
 			received->request = CLEAR;
+            received->sensorvalue = temp;
 			if(logcount%TEMP_LOGGING_INTERVAL==0)
 			{
 				strcpy(received->data,log_str(TEMP_THR, 2, "THIS IS ALSO A TEST, DAWG"));
@@ -468,9 +473,9 @@ int main()
 	    	msg_th1_read->response = CLEAR;
 	    	strcpy(logs,msg_th1_read->data);
 	    	//sync_printf(logs);
-            //sync_printf("Light sensor value %d: %.5lf lux\n", 
-            //    i,
-             //   msg_th1_read->sensorvalue);
+            sync_printf("Light sensor value %d: %.5lf lux\n", 
+                i,
+                msg_th1_read->sensorvalue);
     		i++;
     		msg_th1_write->counter = i;
 	    	msgcpy(shmem_th1, msg_th1_write);
@@ -486,6 +491,9 @@ int main()
 	    	msg_th2_read->response = CLEAR;
 
 	    	strcat(logs,msg_th2_read->data);
+            sync_printf("Temp sensor value %d: %.4f deg C\n", 
+                i,
+                msg_th2_read->sensorvalue);
 	    	//sync_printf(logs);
 	    	//msg_th2_write->request = req2;
 	    	msgcpy(shmem_th2, msg_th2_write);
