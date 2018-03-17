@@ -53,7 +53,8 @@ struct msg{
 	char response;
 	char request;
 	char error;
-	char getsensor;
+	char net_request;
+	double net_response;
 	char close;
 	char data[512];
 	char format;

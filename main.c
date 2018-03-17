@@ -33,12 +33,15 @@
 #include <sys/syscall.h>
 #include <time.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
 #include "ADPS9301.h"
 #include "TMP102.h"
 #include "main.h"
 
 #define DEBUG OFF
-#define SENSOR_OUTPUT ON
+#define SENSOR_OUTPUT OFF
 #define LOGPATH "log.txt"
 
 #define MSG_SIZE_MAX 128
@@ -57,12 +60,17 @@
 #define ACTIVE ON
 #define CLEAR OFF
 
+#define TEMP '1'
+#define LIGHT '0'
+
 #define FAHRENHEIT  'F'
 #define FAKE        'U'
 #define CELSIUS     'C'
 #define KELVIN      'K'
-
 #define LUMEN       'L'
+
+#define PORT 55171
+#define HOSTNAME "ubuntu"
 
 #define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
 #define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
@@ -76,6 +84,7 @@ int halt;
 pthread_t thread1;
 pthread_t thread2;
 pthread_t thread3;
+pthread_t thread4;
 
 pthread_mutex_t printf_mutex;
 pthread_mutex_t log_mutex;
@@ -83,6 +92,7 @@ pthread_mutex_t sensor_mutex;
 pthread_mutex_t th1_mutex;
 pthread_mutex_t th2_mutex;
 pthread_mutex_t th3_mutex;
+pthread_mutex_t th4_mutex;
 pthread_mutex_t cpy_mutex;
 
 /**
@@ -275,8 +285,12 @@ void *thread1_fnt(void* ptr)
         if(received->format==LUMEN)
         {
             pthread_mutex_lock(&sensor_mutex);
-            if(logcount==1) err+=APDS9301_power_on(0x39,"/dev/i2c-1"); //only power on on the first loop
-            err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux); //only light format
+            if(logcount==1)
+            {
+                err+=ADPS9301_power_on(0x39,"/dev/i2c-1"); //only power on on the first loop
+                ADPS9301_run_everything(0x39,"/dev/i2c-1"); //run all the operations as required
+            }
+            err+=ADPS9301_get_lux(0x39,"/dev/i2c-1", &lux); //only light format
             pthread_mutex_unlock(&sensor_mutex);
         }
         else if(received->format==FAKE)
@@ -299,7 +313,7 @@ void *thread1_fnt(void* ptr)
 			if(logcount%LIGHT_LOGGING_INTERVAL==0)
 			{
                 char logbuf[MSG_SIZE_MAX];
-                sprintf(logbuf,"Sensor value: %.5lf lux %c\n",lux, received->format);
+                sprintf(logbuf,"Sensor value: %.5lf lux %c",lux, received->format);
 				strcpy(received->data,log_str(LIGHT_THR, 2, logbuf));
 			}
 			msgcpy(ptr,received);
@@ -375,8 +389,8 @@ void *thread2_fnt(void* ptr)
 			if(logcount%TEMP_LOGGING_INTERVAL==0)
 			{
                 char logbuf[MSG_SIZE_MAX];
-                sprintf(logbuf,"Sensor value: %.4lf deg %c\n",temp,received->format);
-				strcpy(received->data,log_str(TEMP_THR, 2, logbuf));
+                sprintf(logbuf,"Sensor value: %.4lf deg %c",temp,received->format);
+				strcpy(received->data,log_str(SOCKET_THR, 2, logbuf));
 			}
 	    	//sync_printf("My 1 Counter:%d\n",received->counter);
 			msgcpy(ptr,received);
@@ -440,6 +454,98 @@ void *thread3_fnt(void* ptr)
 	free(received);
    	return NULL;
 }
+
+void *thread4_fnt(void* ptr)
+{
+    struct msg *received = malloc(sizeof(struct msg));
+    struct timespec tim;
+    tim.tv_sec = 0;
+    tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
+    int logcount=0;
+    //float temp;
+
+    int sock_ret, newsock_ret, err_ret;;
+    unsigned int cli_length;
+    //char buffer[256];
+    char rx = -1;
+
+    struct sockaddr_in server_addr, cli_addr;
+
+    sync_printf("Server Thread: Active\n");
+
+    sock_ret = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_ret < 0) 
+    sync_printf("Server: ERROR opening socket");
+    bzero((char *) &server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    if (bind(sock_ret, (struct sockaddr *) &server_addr,
+          sizeof(server_addr)) < 0) 
+          sync_printf("Server: ERROR on socket bind");
+
+    listen(sock_ret,5);
+    cli_length = sizeof(cli_addr);
+    
+    newsock_ret = accept(sock_ret, (struct sockaddr *) &cli_addr, &cli_length);
+    
+    if (newsock_ret < 0) 
+          sync_printf("Server: ERROR on accept");
+
+    while(!halt)
+    {
+        logcount++;
+
+        if(rx==-1)
+        {
+            err_ret = read(newsock_ret,&rx,sizeof(rx));
+            if (err_ret < 0) sync_printf("Server: ERROR reading from socket");
+            //sync_printf("Server: Received message: %d\n",rx);
+        }
+
+        pthread_mutex_lock(&th4_mutex);
+        msgcpy(received, ptr);  
+
+        if(received->request == ACTIVE && received->response==CLEAR)
+        {
+            received->response = ACTIVE;
+            received->request = CLEAR;
+            received->net_request = rx;
+            //received->sensorvalue = temp;
+            if(logcount%TEMP_LOGGING_INTERVAL==0)
+            {
+                char logbuf[MSG_SIZE_MAX];
+                sprintf(logbuf,"Socket Request from port %d: %d",PORT,rx);
+                strcpy(received->data,log_str(TEMP_THR, 2, logbuf));
+            }
+            msgcpy(ptr,received);
+        }
+        pthread_mutex_unlock(&th4_mutex);
+
+        sync_printf("%lf",received->net_response);
+        if(received->net_response !=0)
+        {
+            err_ret = write(newsock_ret,&(received->net_response),sizeof(double));
+            if (err_ret < 0) sync_printf("Server: ERROR writing to socket");
+
+            received->net_response = 0;
+            rx=-1;
+        }
+
+        if(received->close == ACTIVE)//recieved close command
+        {
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
+
+        nanosleep(&tim, NULL);
+    }
+    free(received);
+    return NULL;
+}
+
 /**
 ​ ​*​ ​@brief​ main
 ​ ​*
@@ -466,26 +572,33 @@ int main()
     pthread_mutex_init(&th1_mutex, NULL);
     pthread_mutex_init(&th2_mutex, NULL);
     pthread_mutex_init(&th3_mutex, NULL);
+    pthread_mutex_init(&th4_mutex, NULL);
+
 
     void* shmem_th1 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
     void* shmem_th2 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
     void* shmem_th3 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+    void* shmem_th4 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
 
     struct msg *msg_th1_write= malloc(sizeof(struct msg));
  	struct msg *msg_th2_write= malloc(sizeof(struct msg));
  	struct msg *msg_th3_write= malloc(sizeof(struct msg));
+    struct msg *msg_th4_write= malloc(sizeof(struct msg));
 
     struct msg *msg_th1_read= malloc(sizeof(struct msg));
  	struct msg *msg_th2_read= malloc(sizeof(struct msg));
  	struct msg *msg_th3_read= malloc(sizeof(struct msg));
+    struct msg *msg_th4_read= malloc(sizeof(struct msg));
 
     msg_th1_read->response = CLEAR;
     msg_th2_read->response = CLEAR;
     msg_th3_read->response = CLEAR;
+    msg_th4_read->response = CLEAR;
 
     msg_th1_write->request = ACTIVE;
     msg_th2_write->request = ACTIVE;
     msg_th3_write->request = ACTIVE;
+    msg_th4_write->request = ACTIVE;
 
     msg_th1_write->format = DEFAULT_LIGHTFORMAT;
     msg_th2_write->format = DEFAULT_TEMPFORMAT;
@@ -494,6 +607,7 @@ int main()
 	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
 	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
 	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
+    memcpy(shmem_th4, msg_th4_write, sizeof(struct msg));
 
     /* create a first thread which executes thread1_fnt(&x) */
 
@@ -517,6 +631,13 @@ int main()
         return 1;
     }
 
+            /* create a second thread which executes thread2_fnt(&x) */
+    if(pthread_create(&thread4, NULL, (void *)thread4_fnt, shmem_th4)) {
+
+        fprintf(stderr, "Error creating Thread 4\n");
+        return 1;
+    }
+
     int i=0;
 
     char logs[5*LOG_SIZE_MAX];
@@ -531,6 +652,7 @@ int main()
             msg_th1_write->close = ACTIVE;
             msg_th2_write->close = ACTIVE;
             msg_th3_write->close = ACTIVE;
+            msg_th4_write->close = ACTIVE;
         }
 
     	pthread_mutex_lock(&th1_mutex);
@@ -567,6 +689,30 @@ int main()
 	    }
 	    pthread_mutex_unlock(&th2_mutex);
 
+        pthread_mutex_lock(&th4_mutex);
+        msgcpy(msg_th4_read, shmem_th4);
+        if(msg_th4_read->response==ACTIVE && msg_th4_read->request==CLEAR)
+        {
+            msg_th4_write->response = CLEAR;
+            msg_th4_read->response = CLEAR;
+            switch(msg_th4_read->net_request)
+            {
+               case TEMP:
+                  msg_th4_write->net_response = msg_th2_read->sensorvalue;
+                  break; 
+               case LIGHT:
+                  msg_th4_write->net_response = msg_th1_read->sensorvalue;
+                  break; 
+               default:
+                  msg_th4_write->net_response = -89.99; //invalid request
+                  break;
+            }
+            msg_th4_write->net_request = CLEAR;
+            strcat(logs,msg_th4_read->data);
+            msgcpy(shmem_th4, msg_th4_write);
+        }
+        pthread_mutex_unlock(&th4_mutex);
+
     	pthread_mutex_lock(&th3_mutex);
 	   	msgcpy(msg_th3_read, shmem_th3);
 	    if(msg_th3_read->response==ACTIVE && msg_th3_read->request==CLEAR)
@@ -596,16 +742,26 @@ int main()
         //sync_printf("Logger Thread Exited Safely");
     }
 
+    if(pthread_join(thread4, NULL)) {
+    //pthread_mutex_unlock(&th3_mutex);
+    //sync_printf("Logger Thread Exited Safely");
+    }
+
+
     free(msg_th1_write);
  	free(msg_th2_write);
  	free(msg_th3_write);
+    free(msg_th4_write);
     free(msg_th1_read);
  	free(msg_th2_read);
  	free(msg_th3_read);
+    free(msg_th4_read);
 
     munmap(shmem_th1, sizeof(struct msg));
     munmap(shmem_th2, sizeof(struct msg));
     munmap(shmem_th3, sizeof(struct msg));
+    munmap(shmem_th4, sizeof(struct msg));
+
 
     sync_printf("Main Thread Exited Safely");
 
