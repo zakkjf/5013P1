@@ -1,3 +1,23 @@
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​ADPS9301.h
+​ ​*​ ​@brief​ ​light sensor driver Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 i2c light sensor driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
 #ifndef _ADPS9301_H_
 #define _ADPS9301_H_
 
@@ -33,39 +53,206 @@
 #define ADPS9301_INTR_MASK   	0x04
 #define ADPS9301_TIMING_MASK	0x03
 
+/**
+​ ​*​ ​@brief​ ​get channel 0 of light sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_CH0(int addr, char* interface, int16_t* value);
 
+/**
+​ ​*​ ​@brief​ ​get channel 1 of light sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_CH1(int addr, char* interface, int16_t* value);
 
+/**
+​ ​*​ ​@brief​ ​get converted lux value of sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_lux(int addr, char* interface, double* value);
-//device must be powered on before reading
+
+/**
+​ ​*​ ​@brief​ ​power on sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_power_on(int addr, char* interface);
 
+/**
+​ ​*​ ​@brief​ ​run tests for all sensors
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_run_everything(int addr, char* interface);
-//device must be powered on before reading
+
+/**
+​ ​*​ ​@brief​ ​set sensor timing
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param msg to set timing to (two bits)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_set_timing(int addr, char* interface, uint8_t msg);
 
+/**
+​ ​*​ ​@brief​ ​get sensor timing
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param val pointer to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_timing(int addr, char* interface, uint8_t* val);
 
+/**
+​ ​*​ ​@brief​ ​set high gain for sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_set_high_gain(int addr, char* interface);
 
+/**
+​ ​*​ ​@brief​ ​set low gain for sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_set_low_gain(int addr, char* interface);
 
+/**
+​ ​*​ ​@brief​ ​set sensor integration time 
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param msg to set timing to (two bits)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_set_integ_time(int addr, char* interface, uint8_t msg);
 
+/**
+​ ​*​ ​@brief​ ​enable interrupt
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_enable_int(int addr, char* interface);
 
+/**
+​ ​*​ ​@brief​ ​disable interrupt
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_disable_int(int addr, char* interface);
 
+/**
+​ ​*​ ​@brief​ ​get sensor id
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_id(int addr, char* interface, uint8_t* value);
 
-//device must be powered on before reading
+/**
+​ ​*​ ​@brief​ ​set sensor thresholds
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param low threshold
+ * @param high threshold
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_set_thresholds(int addr, char* interface, uint16_t low, uint16_t high);
 
+/**
+​ ​*​ ​@brief​ ​get sensor thresholds
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param low threshold
+ * @param high threshold
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_get_thresholds(int addr, char* interface, uint16_t* low, uint16_t* high);
 
+/**
+​ ​*​ ​@brief​ ​write single register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param reg register to write to
+ * @param msg message to write
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_write_single(int addr, char* interface, char reg, char msg);
 
+/**
+​ ​*​ ​@brief​ ​write single register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param reg register to write to
+ * @param value value to read in
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
 int ADPS9301_read_single(int addr, char* interface, char reg, uint8_t* value);
 
 #endif

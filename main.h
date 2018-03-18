@@ -41,6 +41,8 @@
 #define FILEPATH2 "random.txt"
 #define FILEPATH3 "/proc/stat"
 
+typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
+
 struct info{
 	char * logfile;
 	char * infile;
@@ -55,12 +57,28 @@ struct msg{
 	char error;
 	char net_request;
 	double net_response;
+	char daynight;
 	char close;
 	char data[512];
 	char format;
 	double sensorvalue;
 	int counter;
 };
+
+/**
+​ ​*​ ​@brief​ ​thread-safe message copy
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​dest destination message
+ ​*​ ​@param​ ​src source message
+ ​*​ ​@param​ ​mutex the mutex used
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void* msgcpy( void* dest, const void* src);
 
 /**
 ​ ​*​ ​@brief​ ​Synchronous encapsulator for printf
@@ -75,6 +93,7 @@ struct msg{
 ​ ​*/
 void sync_printf(const char *format, ...);
 
+
 /**
 ​ ​*​ ​@brief​ ​Signal handler for this program
 ​ ​*
@@ -88,28 +107,18 @@ void sync_printf(const char *format, ...);
 void sig_handler(int sig);
 
 /**
-​ ​*​ ​@brief​ ​Synchronous time-tagging function
+​ ​*​ ​@brief​ ​logger function for the logger thread
 ​ ​*
-​ ​*​ ​Synchronously prints a timestamp to the console
+​ ​*​ ​handles logs
 ​ ​*
-​ ​*​ ​@param filename log filename
- * @param​ msg message to accompany timestamp
-​ ​*​ ​@return​ void
-​ ​*/
-int sync_timetag(char * filename, char * msg);
-
-/**
-​ ​*​ ​@brief​ Tracks alphanumeric characters into counting bins
-​ ​*
-​ ​*​ ​Mutexes printf for asynchronous call protection
- * among multiple threads
-​ ​*
-​ ​*​ ​@param​ ch char to track
- * @param arr storage structure for counted bins
+​ ​*​ ​@param​ ​source log source (what thread)
+ * @param level the log level
+ * @param the log message
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-int chartrack(char ch, int * arr);
+char* log_str(source_t source, int level, char* msg);
+
 
 /**
 ​ ​*​ ​@brief​ ​Synchronous logging call for thread and POSIX Ids
@@ -120,6 +129,7 @@ int chartrack(char ch, int * arr);
 ​ ​*​ ​@return​ void
 ​ ​*/
 int sync_log_id(char* filename, char* thread);
+
 
 /**
 ​ ​*​ ​@brief​ ​Synchronous logging call
@@ -132,32 +142,51 @@ int sync_log_id(char* filename, char* thread);
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-int sync_logwrite(char* filename, char* log);
+int sync_logwrite(char* filename,char* log);
 
 /**
-​ ​*​ ​@brief​ ​child thread 1
+​ ​*​ ​@brief​ ​thread 1 = light sensor
 ​ ​*
-​ ​*​ ​This child thread sorts an input random text file
- * from a doubly linked list and prints any characters
- * occurring more than 3 times to the console
-​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading and logging
+​ ​*​ ​This thread produces the light sensor value
+ *
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
 void *thread1_fnt(void* ptr);
 
 /**
-​ ​*​ ​@brief​ ​child thread 2
+​ ​*​ ​@brief​ ​child thread 2: temp sensor
 ​ ​*
-​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
+​ ​*​ ​This child thread reports temp values in various formats
 ​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
 void *thread2_fnt(void* ptr);
 
+/**
+​ ​*​ ​@brief​ ​child thread 3: Logger
+​ ​*
+​ ​*​ ​This child thread runs the logger
+​ ​*
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread3_fnt(void* ptr);
+
+/**
+​ ​*​ ​@brief​ ​child thread 4: Socket
+​ ​*
+​ ​*​ ​This child thread runs a server socket interface for getting temp and light sensor values
+​ ​*
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread4_fnt(void* ptr);
 
 /**
 ​ ​*​ ​@brief​ main
@@ -169,6 +198,5 @@ void *thread2_fnt(void* ptr);
 ​ ​*​ ​
 ​ ​*​ ​@return​ void
 ​ ​*/
-int main();
 
 #endif

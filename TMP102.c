@@ -42,21 +42,151 @@ int TMP102_get_temp_f(int addr, char* interface, float* value)
 
     return ret;
 }
-/*
-//device must be powered on before reading
-int ADPS9301_power_on(int addr, char* interface)
-{
-	int i2c_file = i2c_open(interface);
 
-    if(set_i2c_register(i2c_file, addr, APDS9300_CMD | APDS9300_CONTROL, APDS9300_POWER_ON)) {
-        return (i2c_close(i2c_file)-2); //can't get register, return -2, can't get register AND close fails, return -3
+
+int TMP102_get_temp_k(int addr, char* interface, float* value)
+{
+    float temp_cel;
+    int ret = TMP102_get_temp_c(addr, interface, &temp_cel);
+
+    *value = temp_cel + 273.15; //conversion from celsius to kelvin;
+
+    return ret;
+}
+
+int TMP102_get_tlow(int addr, char* interface, uint8_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_T_LO_REG, 1, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
     }
-    else 
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+int TMP102_get_thigh(int addr, char* interface, uint8_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_T_HI_REG, 2, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+
+int TMP102_get_config(int addr, char* interface, uint16_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_CONF_REG, 1, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+int TMP102_set_config(int addr, char* interface, uint16_t value)
+{
+    unsigned char bytes[2];
+
+    bytes[0] = (unsigned char) value;
+    bytes[1] = (unsigned char) (value >> 8);
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(set_i2c_registers(i2c_file, addr, TMP102_CONF_REG, bytes[0], bytes[1]))
     {
-        return i2c_close(i2c_file); //return 0, return -1 if close fails
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
     }
+
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+
+int TMP102_shutdown_on(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|TMP102_CONF_SHUTDOWN);
+    
+    return 0;
+}
+
+int TMP102_shutdown_off(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(~TMP102_CONF_SHUTDOWN));
 
     return 0;
 }
 
-*/
+int TMP102_EM_on(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|TMP102_CONF_EM);
+
+    return 0;
+}
+
+ int TMP102_EM_off(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(~TMP102_CONF_EM));
+
+    return 0;
+}
+
+int TMP102_set_res(int addr, char* interface, char res)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_RES|res << 5));
+
+    return 0;
+}
+
+int TMP102_set_conv(int addr, char* interface, char conv)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_CONVRATE|(conv << 14)));
+
+    return 0;
+}
+
+int TMP102_set_fault(int addr, char* interface, char fault)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_FAULT|(fault << 3)));
+
+    return 0;
+}
+
+

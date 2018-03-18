@@ -60,14 +60,15 @@
 #define ACTIVE ON
 #define CLEAR OFF
 
+#define DANI '2'
 #define TEMP '1'
 #define LIGHT '0'
 
 #define FAHRENHEIT  'F'
-#define FAKE        'U'
 #define CELSIUS     'C'
 #define KELVIN      'K'
 #define LUMEN       'L'
+#define FAKE        'U'
 
 #define PORT 55171
 #define HOSTNAME "ubuntu"
@@ -75,7 +76,9 @@
 #define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
 #define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
 
-typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
+#define I2C_INTERFACE "/dev/i2c-1"
+#define LIGHT_SENSOR_ADDR 0x39
+#define TEMP_SENSOR_ADDR 0x48
 
 FILE *fp;
 
@@ -270,28 +273,33 @@ void *thread1_fnt(void* ptr)
 	struct timespec tim;
 	tim.tv_sec = 0;
 	tim.tv_nsec = LIGHT_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
-	//char poo;
-	//poo = 0;
-	 //char doo[5];
 	int logcount=0;
     int err = 0;
     double lux;
+    //char chbuf[20];
+    //double luxprev;
+    //char nd; //night or day
     while(1)
     {
     	logcount++;
-    	//sprintf(doo, "%d", poo);
-        
         
         if(received->format==LUMEN)
         {
             pthread_mutex_lock(&sensor_mutex);
             if(logcount==1)
             {
-                err+=ADPS9301_power_on(0x39,"/dev/i2c-1"); //only power on on the first loop
-                ADPS9301_run_everything(0x39,"/dev/i2c-1"); //run all the operations as required
+                err+=ADPS9301_power_on(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //only power on on the first loop
+                //ADPS9301_run_everything(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //run all the operations as required
             }
-            err+=ADPS9301_get_lux(0x39,"/dev/i2c-1", &lux); //only light format
+           // luxprev=lux;
+            err+=ADPS9301_get_lux(LIGHT_SENSOR_ADDR,I2C_INTERFACE, &lux); //only light format
             pthread_mutex_unlock(&sensor_mutex);
+/*
+            if((lux-luxprev)>5)
+            {
+                strcat(chbuf,"SUDDEN CHANGE"); // sudden change of more than 5 lux
+            }
+            */
         }
         else if(received->format==FAKE)
         {
@@ -301,7 +309,18 @@ void *thread1_fnt(void* ptr)
         {
             lux = -99.99; //ERROR - INVALID SENSOR FORMAT
         }
-
+/*
+        if(lux>2) //day or night
+        {
+            nd  = 'D';
+            strcat(chbuf,"Day");
+        }
+        else
+        {
+            nd  = 'N';
+            strcat(chbuf,"Night");
+        }
+*/
         //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
     	pthread_mutex_lock(&th1_mutex);
 		msgcpy(received, ptr);	
@@ -310,9 +329,11 @@ void *thread1_fnt(void* ptr)
             received->sensorvalue = lux;
 			received->response = ACTIVE;
 			received->request = CLEAR;
+           // received->daynight = nd;
 			if(logcount%LIGHT_LOGGING_INTERVAL==0)
 			{
                 char logbuf[MSG_SIZE_MAX];
+                //sprintf(logbuf,"Sensor value: %.5lf lux %c MESSAGES: %s",lux, received->format, chbuf);
                 sprintf(logbuf,"Sensor value: %.5lf lux %c",lux, received->format);
 				strcpy(received->data,log_str(LIGHT_THR, 2, logbuf));
 			}
@@ -355,20 +376,20 @@ void *thread2_fnt(void* ptr)
 	 //char doo[5];
 	int logcount=0;
     float temp;
-    while(!halt)
+    while(1)
     {
     	logcount++;
         pthread_mutex_lock(&sensor_mutex);
         switch(received->format)
         {
            case CELSIUS:
-              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp);
+              TMP102_get_temp_c(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
               break; 
            case FAHRENHEIT:
-              TMP102_get_temp_f(0x48,"/dev/i2c-1", &temp);
+              TMP102_get_temp_f(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
               break; 
            case KELVIN:
-              TMP102_get_temp_c(0x48,"/dev/i2c-1", &temp); //TODO - implement Kelvin
+              TMP102_get_temp_k(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
               break;
            case FAKE:
               temp = logcount%150-25; //fake some *really* rapidly changing temperatures for testing
@@ -471,7 +492,7 @@ void *thread4_fnt(void* ptr)
 
     struct sockaddr_in server_addr, cli_addr;
 
-    sync_printf("Server Thread: Active\n");
+    sync_printf("Server Thread: Active\n"); 
 
     sock_ret = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_ret < 0) 
@@ -493,7 +514,7 @@ void *thread4_fnt(void* ptr)
     if (newsock_ret < 0) 
           sync_printf("Server: ERROR on accept");
 
-    while(!halt)
+    while(1)
     {
         logcount++;
 
@@ -703,6 +724,9 @@ int main()
                case LIGHT:
                   msg_th4_write->net_response = msg_th1_read->sensorvalue;
                   break; 
+               case DANI:
+                  msg_th4_write->net_response = (double)msg_th1_read->daynight;
+                  break;
                default:
                   msg_th4_write->net_response = -89.99; //invalid request
                   break;
@@ -728,23 +752,19 @@ int main()
 
 
     if(pthread_join(thread1, NULL)) {
-        //pthread_mutex_unlock(&th1_mutex);
-       // sync_printf("Light Sensor Thread Exited Safely");
+        sync_printf("Light Sensor Thread Exited Safely");
     }
 
     if(pthread_join(thread2, NULL)) {
-       // pthread_mutex_unlock(&th2_mutex);
-       // sync_printf("Temp Sensor Thread Exited Safely");
+        sync_printf("Temp Sensor Thread Exited Safely");
     }
 
     if(pthread_join(thread3, NULL)) {
-        //pthread_mutex_unlock(&th3_mutex);
-        //sync_printf("Logger Thread Exited Safely");
+        sync_printf("Logger Thread Exited Safely");
     }
 
     if(pthread_join(thread4, NULL)) {
-    //pthread_mutex_unlock(&th3_mutex);
-    //sync_printf("Logger Thread Exited Safely");
+        sync_printf("Socket Thread Exited Safely");
     }
 
 
@@ -764,8 +784,6 @@ int main()
 
 
     sync_printf("Main Thread Exited Safely");
-
-    system("pause");
 
     return 0;
 }
