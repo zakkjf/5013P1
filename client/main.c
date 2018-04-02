@@ -97,8 +97,9 @@ int client(int portno, char* hostname)
     {
         if((sensor=getchar()) != '\n')
         {
-            char send = sensor %2;
-            err_ret = write(sock_ret,&send, sizeof(char));
+            //char send = sensor %2;
+            printf("Sending %c", sensor);    
+            err_ret = write(sock_ret,&sensor, sizeof(char));
             if (err_ret < 0) 
                  printf("Client: ERROR writing to socket");
 

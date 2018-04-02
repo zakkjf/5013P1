@@ -1,0 +1,2419 @@
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​i2c_driver.h
+​ ​*​ ​@brief​ ​i2c driver Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 i2c base driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+
+#ifndef _I2C_DRIVER_H_
+#define _I2C_DRIVER_H_
+
+#include <stdlib.h>
+
+/**
+​ ​*​ ​@brief​ ​open a hardware location
+​ ​*
+​ ​*​ ​opens a hardware location
+​ ​*
+​ ​*​ ​@param​ ​filename the name of the hardware /dev file
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int i2c_open(char* filename);
+/**
+​ ​*​ ​@brief​ ​close a hardware location
+​ ​*
+​ ​*​ ​closes a hardware location
+​ ​*
+​ ​*​ ​@param​ ​i2c file int
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int i2c_close(int i2c_file);
+
+/**
+​ ​*​ ​@brief set a single i2c register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param value value to write to reg
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int set_i2c_register(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char value);
+
+/**
+​ ​*​ ​@brief set a double (16bit) i2c register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param lo byte to write to reg
+ * @param hi byte to write to reg
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int set_i2c_registers(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char lo,
+                            unsigned char hi);
+
+/**
+​ ​*​ ​@brief repeated-start read a register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param val value pointer to read in from register
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int get_i2c_register_repstart(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char *val);
+
+/**
+​ ​*​ ​@brief read a multiple-byte register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param count number of bytes to read
+ * @param vals value pointer to read in from register
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int get_i2c_registers(int file,
+                    unsigned char addr,
+                    unsigned char reg,
+                    unsigned char count,
+                    unsigned char *vals);
+
+#endif
+struct msg {
+	char * str;
+	int strlen;
+	char LED;
+};
+
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​main.c
+​ ​*​ ​@brief​ ​Sockets Client Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 socket client
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+
+#include <pthread.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include "msgstruct.h"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
+  
+
+#define PORT 55171
+#define HOSTNAME "ubuntu"
+
+/**
+​ ​*​ ​@brief​ ​prompt, prints options for request from server
+​ ​*
+​ ​*​ ​prints options
+​ ​*
+​ ​*/
+void prompt()
+{
+    printf("\n0 - Light\n");
+    printf("1 - Temp\n");
+    printf("2 - Day/Night\n");
+    printf("Enter a choice:");
+}
+
+/**
+​ ​*​ ​@brief​ ​client-side socket process function
+​ ​*
+​ ​*​ ​sends a sample message struct to a server at a given location
+​ ​*
+​ ​*​ ​@param​ ​portno port number
+ * @param hostname the hostname of the server
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+
+int client(int portno, char* hostname)
+{
+    int sock_ret, err_ret;
+    struct hostent *server;
+    struct sockaddr_in server_addr;
+
+    printf("Client Thread: Active\n");
+
+    sock_ret = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_ret < 0) 
+        printf("Client: ERROR opening socket");
+
+    server = gethostbyname(hostname);
+
+    if (server == NULL) {
+        printf("Client: ERROR, host does not seem to exist\n");
+        return 1;
+    }
+    bzero((char *) &server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&server_addr.sin_addr.s_addr,
+         server->h_length);
+    server_addr.sin_port = htons(portno);
+    if (connect(sock_ret,(struct sockaddr *)&server_addr,sizeof(server_addr)) < 0) 
+        printf("Client: ERROR connecting");
+
+    char sensor = 1;
+    double sensorval = 0;
+
+    prompt();
+    while(1)
+    {
+        if((sensor=getchar()) != '\n')
+        {
+            char send = sensor %2;
+            err_ret = write(sock_ret,&send, sizeof(char));
+            if (err_ret < 0) 
+                 printf("Client: ERROR writing to socket");
+
+            err_ret = read(sock_ret,&sensorval,sizeof(double));
+            if (err_ret < 0)
+                 printf("Client: ERROR reading from socket");
+
+            if(sensor == '2')
+            {
+                if(sensorval<2)
+                {
+                    printf("\nIt is night");      
+                }
+                else
+                {
+                    printf("\nIt is day");  
+                }
+
+            }
+            else
+            {
+                printf("\nClient: Message received from server: %lf\n", sensorval);
+
+            }
+
+            prompt();
+        }
+    }
+    printf("Client: Exiting\n");
+
+    return 0;
+}
+
+int main(void)
+{
+    printf("ECEN 5013 Project1 Socket Client\n\n");
+
+    client(PORT, HOSTNAME);
+}
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ ​is​ ​permitted​ ​as​ ​long​ ​as​ ​the​ ​files​ ​maintain​ ​this​ ​copyright.​ ​Users​ ​are
+​ ​*​ ​permitted​ ​to​ ​modify​ ​this​ ​and​ ​use​ ​it​ ​to​ ​learn​ ​about​ ​the​ ​field​ ​of​ ​embedded
+​ ​*​ ​software.​ Zach Farmer, ​Alex​ ​Fosdick​, and​ ​the​ ​University​ ​of​ ​Colorado​ ​are​ ​not​
+ * ​liable​ ​for ​any​ ​misuse​ ​of​ ​this​ ​material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​main.h
+​ ​*​ ​@brief​ ​pThreads exercise header file
+​ ​*
+​ ​*​ ​This is the header file for a three-thread PThreads example demonstrating
+ * syncronous logging, printing, signal handling, file handling,
+ * and CPU utilization stats
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Feb 18 2018
+​ ​*​ ​@version​ ​1.0
+​ ​*
+​ ​*/
+
+#ifndef MAIN_H_INCLUDED
+#define MAIN_H_INCLUDED
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdarg.h>
+#include <sys/syscall.h>
+#include "main.h"
+
+
+#define FILEPATH "log.txt"
+#define FILEPATH2 "random.txt"
+#define FILEPATH3 "/proc/stat"
+
+typedef enum {TEMP_THR,LIGHT_THR,SOCKET_THR,MASTER_THR} source_t;
+
+struct info{
+	char * logfile;
+	char * infile;
+	char * procstat;
+};
+
+struct msg{
+	char initsuccess;
+	//heartbeat notifications
+	char response;
+	char request;
+	char error;
+	char net_request;
+	double net_response;
+	char daynight;
+	char close;
+	char data[512];
+	char format;
+	double sensorvalue;
+	int counter;
+};
+
+/**
+​ ​*​ ​@brief​ ​thread-safe message copy
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​dest destination message
+ ​*​ ​@param​ ​src source message
+ ​*​ ​@param​ ​mutex the mutex used
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void* msgcpy( void* dest, const void* src);
+
+/**
+​ ​*​ ​@brief​ ​Synchronous encapsulator for printf
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​format print formatting
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void sync_printf(const char *format, ...);
+
+
+/**
+​ ​*​ ​@brief​ ​Signal handler for this program
+​ ​*
+​ ​*​ ​handles SIGUSR1 and SIGUSR2 signals,
+ * which exit all child threads
+​ ​*
+​ ​*​ ​@param​ ​sig received signal
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void sig_handler(int sig);
+
+/**
+​ ​*​ ​@brief​ ​logger function for the logger thread
+​ ​*
+​ ​*​ ​handles logs
+​ ​*
+​ ​*​ ​@param​ ​source log source (what thread)
+ * @param level the log level
+ * @param the log message
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+char* log_str(source_t source, int level, char* msg);
+
+
+/**
+​ ​*​ ​@brief​ ​Synchronous logging call for thread and POSIX Ids
+​ ​*
+​ ​*​ ​@param​ ​filename filename of log
+ * @param thread name of present thread (as char *)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int sync_log_id(char* filename, char* thread);
+
+
+/**
+​ ​*​ ​@brief​ ​Synchronous logging call
+​ ​*
+​ ​*​ ​logs synchonously to specified file
+​ ​*
+​ ​*​ ​@param​ ​filename of log
+ * @param name of thread thread currently logging
+ * @param log text to log
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int sync_logwrite(char* filename,char* log);
+
+/**
+​ ​*​ ​@brief​ ​thread 1 = light sensor
+​ ​*
+​ ​*​ ​This thread produces the light sensor value
+ *
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread1_fnt(void* ptr);
+
+/**
+​ ​*​ ​@brief​ ​child thread 2: temp sensor
+​ ​*
+​ ​*​ ​This child thread reports temp values in various formats
+​ ​*
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread2_fnt(void* ptr);
+
+/**
+​ ​*​ ​@brief​ ​child thread 3: Logger
+​ ​*
+​ ​*​ ​This child thread runs the logger
+​ ​*
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread3_fnt(void* ptr);
+
+/**
+​ ​*​ ​@brief​ ​child thread 4: Socket
+​ ​*
+​ ​*​ ​This child thread runs a server socket interface for getting temp and light sensor values
+​ ​*
+​ ​*​ ​@param​ ​void pointer, usually for msg struct
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread4_fnt(void* ptr);
+
+/**
+​ ​*​ ​@brief​ main
+​ ​*
+​ ​*​ Begins logging, calls child threads, synchonously
+ * waits until child thread completion to continue,
+ * initializes signal handlers, mutexes, and info object
+​ ​*
+​ ​*​ ​
+​ ​*​ ​@return​ void
+​ ​*/
+
+#endif
+#include <stdio.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include <math.h>
+#include "i2c_driver.h"
+#include "ADPS9301.h"
+
+static int ADPS9301_get_CH(int addr, char* interface, int16_t* value, unsigned char ch_lo, unsigned char ch_hi)
+{
+    unsigned char lobyte, hibyte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get low byte
+    if(get_i2c_register_repstart(i2c_file, addr, ADPS9301_CMD | ch_lo, &lobyte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+    //get high byte
+    if(get_i2c_register_repstart(i2c_file, addr, ADPS9301_CMD | ch_hi, &hibyte)) {
+        return i2c_close(i2c_file)-4; //ret -4 if unable to get register, -5 if close fails also
+    }
+
+	*value = (hibyte << 8) | lobyte;
+    return i2c_close(i2c_file); 
+}
+
+int ADPS9301_get_CH0(int addr, char* interface, int16_t* value)
+{
+    return ADPS9301_get_CH(addr, interface, value, ADPS9301_CH0LOW, ADPS9301_CH0HIGH);
+}
+
+int ADPS9301_get_CH1(int addr, char* interface, int16_t* value)
+{
+    return ADPS9301_get_CH(addr, interface, value, ADPS9301_CH1LOW, ADPS9301_CH1HIGH);
+}
+
+int ADPS9301_get_lux(int addr, char* interface, double* value)
+{
+    int16_t CH0_int, CH1_int;
+    double ratio, CH0_d, CH1_d;
+    int ret = 0;
+    
+    ret += ADPS9301_get_CH0(addr, interface, &CH0_int);
+    ret += ADPS9301_get_CH1(addr, interface, &CH1_int);
+
+    //begin conversion
+    CH0_d = (double)CH0_int;
+    CH1_d = (double)CH0_int;
+    ratio = CH1_d/CH0_d;
+
+    if(ratio > 0 && ratio <= 0.5)
+    {
+        *value = (0.0304 * CH0_d) - (0.062 * CH0_d * pow(ratio, 1.4));
+    }
+    else if(ratio > 0.5 && ratio <= 0.61)
+    {
+        *value = (0.0224 * CH0_d) - (0.031 * CH1_d);
+    }
+    else if(ratio > 0.61 && ratio <= 0.8)
+    {
+        *value = (0.0128 * CH0_d) - (0.0153 * CH1_d);
+    }
+    else if(ratio > 0.8 && ratio <= 1.3)
+    {
+        *value = (0.00146 * CH0_d) - (0.00112 * CH1_d);
+    }
+    else if(ratio > 1.3)
+    {
+        *value = 0;
+    }
+    else
+    {
+        return -7; //conversion error
+    }
+
+    return ret;
+}
+
+int ADPS9301_run_everything(int addr, char* interface)
+{
+    uint8_t val;
+    uint8_t testwrite = 0;
+    uint16_t low, high;
+    ADPS9301_power_on(addr, interface);
+    ADPS9301_get_timing(addr, interface, &val);
+    ADPS9301_set_timing(addr, interface, val);
+    ADPS9301_set_low_gain(addr, interface);
+    ADPS9301_set_high_gain(addr, interface);
+    ADPS9301_set_integ_time(addr, interface, testwrite);
+    ADPS9301_disable_int(addr, interface);
+    ADPS9301_enable_int(addr, interface);
+    ADPS9301_get_id(addr, interface, &val);
+    ADPS9301_get_thresholds(addr, interface, &low, &high);
+    ADPS9301_set_thresholds(addr, interface, low, high);
+    return 0;
+}
+
+//device must be powered on before reading
+int ADPS9301_power_on(int addr, char* interface)
+{
+    ADPS9301_write_single(addr, interface, ADPS9301_CONTROL, ADPS9301_POWER_ON);
+    return 0;
+}
+
+//device must be powered on before reading
+int ADPS9301_set_timing(int addr, char* interface, uint8_t msg)
+{
+    ADPS9301_write_single(addr, interface, ADPS9301_TIMING, msg);
+    return 0;
+}
+
+int ADPS9301_get_timing(int addr, char* interface, uint8_t* value)
+{
+    ADPS9301_read_single(addr, interface, ADPS9301_TIMING, value);
+    return 0;
+}
+
+int ADPS9301_set_high_gain(int addr, char* interface)
+{
+    uint8_t snd;
+    ADPS9301_get_timing(addr,interface,&snd);
+    ADPS9301_set_timing(addr,interface,snd|ADPS9301_GAIN_MASK);
+    return 0;
+}
+
+int ADPS9301_set_low_gain(int addr, char* interface)
+{
+    uint8_t snd;
+    ADPS9301_get_timing(addr,interface,&snd);
+    ADPS9301_set_timing(addr,interface,snd|(~ADPS9301_GAIN_MASK));
+    return 0;
+}
+
+int ADPS9301_set_integ_time(int addr, char* interface, uint8_t msg)
+{
+    uint8_t snd;
+    ADPS9301_get_timing(addr,interface,&snd);
+    ADPS9301_set_timing(addr,interface,snd|(ADPS9301_TIMING_MASK|msg));
+    return 0;
+}
+
+int ADPS9301_enable_int(int addr, char* interface)
+{
+    uint8_t snd;
+    ADPS9301_get_timing(addr,interface,&snd);
+    ADPS9301_set_timing(addr,interface,snd|ADPS9301_INTR_MASK);
+    return 0;
+}
+
+int ADPS9301_disable_int(int addr, char* interface)
+{
+    uint8_t snd;
+    ADPS9301_get_timing(addr,interface,&snd);
+    ADPS9301_set_timing(addr,interface,snd|(~ADPS9301_INTR_MASK));
+    return 0;
+}
+
+int ADPS9301_get_id(int addr, char* interface, uint8_t* value)
+{
+    ADPS9301_read_single(addr,interface,ADPS9301_ID, value);
+    return 0;
+}
+
+
+//device must be powered on before reading
+int ADPS9301_set_thresholds(int addr, char* interface, uint16_t low, uint16_t high)
+{
+    ADPS9301_write_single(addr, interface, ADPS9301_THRESHLOWLOW, (uint8_t)(low));
+    ADPS9301_write_single(addr, interface, ADPS9301_THRESHLOWHIGH, (uint8_t)(low >> 8));
+    ADPS9301_write_single(addr, interface, ADPS9301_THRESHHIGHLOW, (uint8_t)(high));
+    ADPS9301_write_single(addr, interface, ADPS9301_THRESHHIGHHIGH, (uint8_t)(high >> 8));
+
+    return 0;
+}
+
+int ADPS9301_get_thresholds(int addr, char* interface, uint16_t* low, uint16_t* high)
+{
+    uint8_t tll, tlh, thl, thh;
+    ADPS9301_read_single(addr, interface, ADPS9301_THRESHLOWLOW,&tll);
+    ADPS9301_read_single(addr, interface, ADPS9301_THRESHLOWHIGH,&tlh);
+    ADPS9301_read_single(addr, interface, ADPS9301_THRESHHIGHLOW,&thl);
+    ADPS9301_read_single(addr, interface, ADPS9301_THRESHHIGHHIGH,&thh);
+
+    *low = (tlh << 8) | tll;
+    *high = (thh << 8) | thl;
+
+    return 0;
+}
+
+//device must be powered on before reading
+int ADPS9301_write_single(int addr, char* interface, char reg, char msg)
+{
+    int i2c_file = i2c_open(interface);
+
+    if(set_i2c_register(i2c_file, addr, ADPS9301_CMD | reg, msg)) {
+        return (i2c_close(i2c_file)-2); //can't get register, return -2, can't get register AND close fails, return -3
+    }
+    else 
+    {
+        return i2c_close(i2c_file); //return 0, return -1 if close fails
+    }
+
+    return 0;
+}
+
+int ADPS9301_read_single(int addr, char* interface, char reg, uint8_t* value)
+{
+    int i2c_file = i2c_open(interface);
+
+    //get low byte
+    if(get_i2c_register_repstart(i2c_file, addr, ADPS9301_CMD | reg, value)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    return i2c_close(i2c_file); 
+}  /*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​main.c
+​ ​*​ ​@brief​ ​tmp102 driver Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 tmp102 temp sensor driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+#ifndef _TMP102_H_
+#define _TMP102_H_
+
+#include <stdint.h>
+
+/* Command register bits */
+#define TMP102_TEMP_REG 0x00
+#define TMP102_CONF_REG 0x01
+#define TMP102_T_LO_REG 0x02
+#define TMP102_T_HI_REG 0x03
+
+#define TMP102_CONVRATE_POINT25HZ 0x00
+#define TMP102_CONVRATE_1HZ 0x01
+#define TMP102_CONVRATE_4HZ 0x02 //default
+#define TMP102_CONVRATE_8HZ 0x03
+
+#define TMP102_CONF_SHUTDOWN 0x0001
+#define TMP102_CONF_RES 	 0x0060
+#define TMP102_CONF_FAULT 	 0x0018
+#define TMP102_CONF_EM 		 0x1000
+#define TMP102_CONF_CONVRATE 0xC000
+
+/**
+​ ​*​ ​@brief​ ​get temp in celsius
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value float to pass temp into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_temp_c(int addr, char* interface, float* value);
+
+/**
+​ ​*​ ​@brief​ ​get temp in fahrenheit
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value float to pass temp into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_temp_f(int addr, char* interface, float* value);
+
+/**
+​ ​*​ ​@brief​ ​get temp in kelvin
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value float to pass temp into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_temp_k(int addr, char* interface, float* value);
+
+/**
+​ ​*​ ​@brief​ ​get tlow threshhold register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value float to pass tlow into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_tlow(int addr, char* interface, uint8_t* value);
+
+/**
+​ ​*​ ​@brief​ ​get thigh  threshold register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value float to pass temp into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_thigh(int addr, char* interface, uint8_t* value);
+
+/**
+​ ​*​ ​@brief​ ​get sensor config
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_get_config(int addr, char* interface, uint16_t* value);
+
+/**
+​ ​*​ ​@brief​ ​get sensor config
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into sensor
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_set_config(int addr, char* interface, uint16_t value);
+
+/**
+​ ​*​ ​@brief​ ​shutdown sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_shutdown_on(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​turn on sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_shutdown_off(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​turn on EM mode
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_EM_on(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​turn off EM mode
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_EM_off(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​set resolution of sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param res resolution of sensor (LSB two bits only)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_set_res(int addr, char* interface, char res);
+
+/**
+​ ​*​ ​@brief​ ​set conv rate of sensor (see defines for choices)
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param res resolution of sensor (LSB two bits only)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_set_conv(int addr, char* interface, char conv);
+
+/**
+​ ​*​ ​@brief​ ​set fault bits in sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param res resolution of sensor (LSB two bits only)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int TMP102_set_fault(int addr, char* interface, char fault);
+
+#endif
+
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ ​is​ ​permitted​ ​as​ ​long​ ​as​ ​the​ ​files​ ​maintain​ ​this​ ​copyright.​ ​Users​ ​are
+​ ​*​ ​permitted​ ​to​ ​modify​ ​this​ ​and​ ​use​ ​it​ ​to​ ​learn​ ​about​ ​the​ ​field​ ​of​ ​embedded
+​ ​*​ ​software.​ Zach Farmer, ​Alex​ ​Fosdick​, and​ ​the​ ​University​ ​of​ ​Colorado​ ​are​ ​not​
+ * ​liable​ ​for ​any​ ​misuse​ ​of​ ​this​ ​material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​main.c
+​ ​*​ ​@brief​ ​pThreads example source
+​ ​*
+​ ​*​ ​This is the source file for a three-thread PThreads example demonstrating
+ * syncronous logging, printing, signal handling, file handling,
+ * and CPU utilization stats
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Feb 18 2018
+​ ​*​ ​@version​ ​1.0
+​ ​*
+​ ​*/
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <stdarg.h>
+#include <sys/syscall.h>
+#include <time.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h> 
+#include "ADPS9301.h"
+#include "TMP102.h"
+#include "main.h"
+
+#define DEBUG OFF
+#define SENSOR_OUTPUT OFF
+#define LOGPATH "log.txt"
+
+#define MSG_SIZE_MAX 128
+#define LOG_SIZE_MAX 256
+
+#define TEMP_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+#define LIGHT_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+
+#define DEFAULT_LIGHTFORMAT FAKE
+#define DEFAULT_TEMPFORMAT FAKE
+
+/*DON'T MESS WITH ANYTHING BELOW THIS LINE*/
+/*--------------------------------------------------------------*/
+#define ON 1
+#define OFF 0
+#define ACTIVE ON
+#define CLEAR OFF
+
+#define DANI '2'
+#define TEMP '1'
+#define LIGHT '0'
+
+#define FAHRENHEIT  'F'
+#define CELSIUS     'C'
+#define KELVIN      'K'
+#define LUMEN       'L'
+#define FAKE        'U'
+
+#define PORT 55171
+#define HOSTNAME "ubuntu"
+
+#define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
+#define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
+
+#define I2C_INTERFACE "/dev/i2c-1"
+#define LIGHT_SENSOR_ADDR 0x39
+#define TEMP_SENSOR_ADDR 0x48
+
+FILE *fp;
+
+int halt;
+
+pthread_t thread1;
+pthread_t thread2;
+pthread_t thread3;
+pthread_t thread4;
+
+pthread_mutex_t printf_mutex;
+pthread_mutex_t log_mutex;
+pthread_mutex_t sensor_mutex;
+pthread_mutex_t th1_mutex;
+pthread_mutex_t th2_mutex;
+pthread_mutex_t th3_mutex;
+pthread_mutex_t th4_mutex;
+pthread_mutex_t cpy_mutex;
+
+/**
+​ ​*​ ​@brief​ ​thread-safe message copy
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​dest destination message
+ ​*​ ​@param​ ​src source message
+ ​*​ ​@param​ ​mutex the mutex used
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void* msgcpy( void* dest, const void* src)
+{
+	pthread_mutex_lock(&cpy_mutex);
+	memcpy(dest, src, sizeof(struct msg));
+	pthread_mutex_unlock(&cpy_mutex);
+	return dest;
+}
+/**
+​ ​*​ ​@brief​ ​Synchronous encapsulator for printf
+​ ​*
+​ ​*​ ​Mutexes printf for asynchronous call protection
+ * among multiple threads
+​ ​*
+​ ​*​ ​@param​ ​format print formatting
+ * @param ... variadic arguments for print (char *, char, etc)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void sync_printf(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    pthread_mutex_lock(&printf_mutex);
+    vprintf(format, args);
+    pthread_mutex_unlock(&printf_mutex);
+
+    va_end(args);
+}
+
+/**
+​ ​*​ ​@brief​ ​Signal handler for this program
+​ ​*
+​ ​*​ ​handles SIGUSR1 and SIGUSR2 signals,
+ * which exit all child threads
+​ ​*
+​ ​*​ ​@param​ ​sig received signal
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void sig_handler(int sig)
+{
+    halt = ACTIVE;
+}
+
+char* log_str(source_t source, int level, char* msg)
+{
+	char* buffer = malloc(sizeof(char)*MSG_SIZE_MAX);
+    time_t timer;
+    char timebuf[25];
+    struct tm* time_inf;
+
+    time(&timer);
+
+    time_inf = localtime(&timer);
+    strftime(timebuf, 25, "%m/%d/%Y %H:%M:%S", time_inf);
+
+    char* name;
+	switch(source)
+	{
+	   case LIGHT_THR  :
+	      name = "Light Sensor Thread";
+	      break; 
+	   case TEMP_THR  :
+	      name = "Temp Sensor Thread";
+	      break; 
+	   case SOCKET_THR :
+	      name = "Socket Thread";
+	      break; 
+	   case MASTER_THR  :
+	      name = "Master Thread";
+	      break; 
+   	   default :
+	      name = "Other";
+	}
+
+    sprintf(buffer, "%s, Level %d, Time: %s, Message:%s\n",
+    		name,
+    		level,
+    		timebuf,
+    		msg);
+
+    return buffer;
+}
+
+/**
+​ ​*​ ​@brief​ ​Synchronous logging call for thread and POSIX Ids
+​ ​*
+​ ​*​ ​@param​ ​filename filename of log
+ * @param thread name of present thread (as char *)
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int sync_log_id(char* filename, char* thread)
+{
+    pthread_mutex_lock(&log_mutex);
+    int tid, pid;
+    tid = syscall(SYS_gettid);
+    pid = getpid();
+
+	fp = fopen (filename, "a");
+
+	fprintf(fp,"%s", thread);
+	fprintf(fp,"%s"," : ");
+	fprintf(fp,"Linux Thread ID: %d POSIX Thread ID: %d",tid,pid);
+	fprintf(fp,"%s","\n");
+	//Flush file output
+	fflush(fp);
+
+	//Close the file
+	fclose(fp);
+    pthread_mutex_unlock(&log_mutex);
+
+    return 0;
+}
+
+/**
+​ ​*​ ​@brief​ ​Synchronous logging call
+​ ​*
+​ ​*​ ​logs synchonously to specified file
+​ ​*
+​ ​*​ ​@param​ ​filename of log
+ * @param name of thread thread currently logging
+ * @param log text to log
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int sync_logwrite(char* filename,char* log)
+{
+    pthread_mutex_lock(&log_mutex);
+
+	fp = fopen (filename, "a");
+
+	fprintf(fp,"%s", log);
+
+	//Flush file output
+	fflush(fp);
+
+	//Close the file
+	fclose(fp);
+    pthread_mutex_unlock(&log_mutex);
+
+    return 0;
+}
+/**
+​ ​*​ ​@brief​ ​child thread 1
+​ ​*
+​ ​*​ ​This child thread sorts an input random text file
+ * from a doubly linked list and prints any characters
+ * occurring more than 3 times to the console
+​ ​*
+​ ​*​ ​@param​ ​nfo info struct containing filenames for reading and logging
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread1_fnt(void* ptr)
+{
+    //
+	struct msg *received = malloc(sizeof(struct msg));
+	struct timespec tim;
+	tim.tv_sec = 0;
+	tim.tv_nsec = LIGHT_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
+	int logcount=0;
+    int err = 0;
+    double lux;
+    //char chbuf[20];
+    //double luxprev;
+    //char nd; //night or day
+    while(1)
+    {
+    	logcount++;
+        
+        if(received->format==LUMEN)
+        {
+            pthread_mutex_lock(&sensor_mutex);
+            if(logcount==1)
+            {
+                err+=ADPS9301_power_on(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //only power on on the first loop
+                //ADPS9301_run_everything(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //run all the operations as required
+            }
+           // luxprev=lux;
+            err+=ADPS9301_get_lux(LIGHT_SENSOR_ADDR,I2C_INTERFACE, &lux); //only light format
+            pthread_mutex_unlock(&sensor_mutex);
+/*
+            if((lux-luxprev)>5)
+            {
+                strcat(chbuf,"SUDDEN CHANGE"); // sudden change of more than 5 lux
+            }
+            */
+        }
+        else if(received->format==FAKE)
+        {
+            lux = logcount%20; //fake some really rapidly changing lux data
+        }
+        else
+        {
+            lux = -99.99; //ERROR - INVALID SENSOR FORMAT
+        }
+/*
+        if(lux>2) //day or night
+        {
+            nd  = 'D';
+            strcat(chbuf,"Day");
+        }
+        else
+        {
+            nd  = 'N';
+            strcat(chbuf,"Night");
+        }
+*/
+        //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
+    	pthread_mutex_lock(&th1_mutex);
+		msgcpy(received, ptr);	
+	    if(received->request == ACTIVE && received->response==CLEAR)
+	    {
+            received->sensorvalue = lux;
+			received->response = ACTIVE;
+			received->request = CLEAR;
+           // received->daynight = nd;
+			if(logcount%LIGHT_LOGGING_INTERVAL==0)
+			{
+                char logbuf[MSG_SIZE_MAX];
+                //sprintf(logbuf,"Sensor value: %.5lf lux %c MESSAGES: %s",lux, received->format, chbuf);
+                sprintf(logbuf,"Sensor value: %.5lf lux %c",lux, received->format);
+				strcpy(received->data,log_str(LIGHT_THR, 2, logbuf));
+			}
+			msgcpy(ptr,received);
+	    }
+		pthread_mutex_unlock(&th1_mutex);
+
+        if(received->close == ACTIVE) //recieved close command
+        {
+            free(received);
+            //sync_printf("exiting");
+            pthread_exit(NULL);
+            return NULL;
+        }
+		nanosleep(&tim, NULL);
+    }
+
+    free(received);
+   	return NULL;
+}
+
+
+/**
+​ ​*​ ​@brief​ ​child thread 2
+​ ​*
+​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
+​ ​*
+​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread2_fnt(void* ptr)
+{
+	struct msg *received = malloc(sizeof(struct msg));
+	struct timespec tim;
+	tim.tv_sec = 0;
+	tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
+	//char poo;
+	//poo = 0;
+	 //char doo[5];
+	int logcount=0;
+    float temp;
+    while(1)
+    {
+    	logcount++;
+        pthread_mutex_lock(&sensor_mutex);
+        switch(received->format)
+        {
+           case CELSIUS:
+              TMP102_get_temp_c(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
+              break; 
+           case FAHRENHEIT:
+              TMP102_get_temp_f(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
+              break; 
+           case KELVIN:
+              TMP102_get_temp_k(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
+              break;
+           case FAKE:
+              temp = logcount%150-25; //fake some *really* rapidly changing temperatures for testing
+              break;
+           default :
+              temp = -99.99;  //ERROR, INVALID FORMAT
+        }
+        pthread_mutex_unlock(&sensor_mutex);
+    	//sprintf(doo, "%d", poo);
+    	pthread_mutex_lock(&th2_mutex);
+    	//poo++;
+		msgcpy(received, ptr);	
+	    if(received->request == ACTIVE && received->response==CLEAR)
+	    {
+			received->response = ACTIVE;
+			received->request = CLEAR;
+            received->sensorvalue = temp;
+			if(logcount%TEMP_LOGGING_INTERVAL==0)
+			{
+                char logbuf[MSG_SIZE_MAX];
+                sprintf(logbuf,"Sensor value: %.4lf deg %c",temp,received->format);
+				strcpy(received->data,log_str(SOCKET_THR, 2, logbuf));
+			}
+	    	//sync_printf("My 1 Counter:%d\n",received->counter);
+			msgcpy(ptr,received);
+	    }
+		pthread_mutex_unlock(&th2_mutex);
+
+        if(received->close == ACTIVE)//recieved close command
+        {
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
+
+		nanosleep(&tim, NULL);
+    }
+    free(received);
+   	return NULL;
+}
+
+/**
+​ ​*​ ​@brief​ ​child thread 3: logger
+​ ​*
+​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
+​ ​*
+​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+void *thread3_fnt(void* ptr)
+{
+     //
+	struct msg *received = malloc(sizeof(struct msg));
+	struct timespec tim;
+	tim.tv_sec = 0;
+	tim.tv_nsec = 1000000L; //1ms sampling loop
+    while(1)
+    {
+    	pthread_mutex_lock(&th3_mutex);
+		msgcpy(received, ptr);	
+	    if(received->request == ACTIVE && received->response==CLEAR)
+	    {
+			received->response = ACTIVE;
+			received->request = CLEAR;
+			#if DEBUG == ACTIVE
+			sync_printf(received->data);//print the logs to terminal
+			#endif
+			sync_logwrite(LOGPATH,received->data);
+			msgcpy(ptr,received);
+	    }
+		pthread_mutex_unlock(&th3_mutex);
+
+        if(received->close == ACTIVE)
+        { //recieved close command
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
+		nanosleep(&tim, NULL);
+
+    }
+	free(received);
+   	return NULL;
+}
+
+void *thread4_fnt(void* ptr)
+{
+    struct msg *received = malloc(sizeof(struct msg));
+    struct timespec tim;
+    tim.tv_sec = 0;
+    tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
+    int logcount=0;
+    //float temp;
+
+    int sock_ret, newsock_ret, err_ret;;
+    unsigned int cli_length;
+    //char buffer[256];
+    char rx = -1;
+
+    struct sockaddr_in server_addr, cli_addr;
+
+    sync_printf("Server Thread: Active\n"); 
+
+    sock_ret = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_ret < 0) 
+    sync_printf("Server: ERROR opening socket");
+    bzero((char *) &server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+
+    if (bind(sock_ret, (struct sockaddr *) &server_addr,
+          sizeof(server_addr)) < 0) 
+          sync_printf("Server: ERROR on socket bind");
+
+    listen(sock_ret,5);
+    cli_length = sizeof(cli_addr);
+    
+    newsock_ret = accept(sock_ret, (struct sockaddr *) &cli_addr, &cli_length);
+    
+    if (newsock_ret < 0) 
+          sync_printf("Server: ERROR on accept");
+
+    while(1)
+    {
+        logcount++;
+
+        if(rx==-1)
+        {
+            err_ret = read(newsock_ret,&rx,sizeof(rx));
+            if (err_ret < 0) sync_printf("Server: ERROR reading from socket");
+            //sync_printf("Server: Received message: %d\n",rx);
+        }
+
+        pthread_mutex_lock(&th4_mutex);
+        msgcpy(received, ptr);  
+
+        if(received->request == ACTIVE && received->response==CLEAR)
+        {
+            received->response = ACTIVE;
+            received->request = CLEAR;
+            received->net_request = rx;
+            //received->sensorvalue = temp;
+            if(logcount%TEMP_LOGGING_INTERVAL==0)
+            {
+                char logbuf[MSG_SIZE_MAX];
+                sprintf(logbuf,"Socket Request from port %d: %d",PORT,rx);
+                strcpy(received->data,log_str(TEMP_THR, 2, logbuf));
+            }
+            msgcpy(ptr,received);
+        }
+        pthread_mutex_unlock(&th4_mutex);
+
+        sync_printf("%lf",received->net_response);
+        if(received->net_response !=0)
+        {
+            err_ret = write(newsock_ret,&(received->net_response),sizeof(double));
+            if (err_ret < 0) sync_printf("Server: ERROR writing to socket");
+
+            received->net_response = 0;
+            rx=-1;
+        }
+
+        if(received->close == ACTIVE)//recieved close command
+        {
+            free(received);
+            pthread_exit(NULL);
+            return NULL;
+        }
+
+        nanosleep(&tim, NULL);
+    }
+    free(received);
+    return NULL;
+}
+
+/**
+​ ​*​ ​@brief​ main
+​ ​*
+​ ​*​ Begins logging, calls child threads, synchonously
+ * waits until child thread completion to continue,
+ * initializes signal handlers, mutexes, and info object
+​ ​*
+​ ​*​ ​
+​ ​*​ ​@return​ void
+​ ​*/
+int main()
+{
+    //attach signal handlers
+    if (signal(SIGUSR1, sig_handler) == SIG_ERR)
+        sync_printf("Error: Can't catch SIGUSR1\n");
+    siginterrupt(SIGUSR1, 0);
+
+
+
+    //initialize mutexes for logging and printing
+    pthread_mutex_init(&printf_mutex, NULL);
+    pthread_mutex_init(&log_mutex, NULL);
+    pthread_mutex_init(&sensor_mutex, NULL);
+    pthread_mutex_init(&th1_mutex, NULL);
+    pthread_mutex_init(&th2_mutex, NULL);
+    pthread_mutex_init(&th3_mutex, NULL);
+    pthread_mutex_init(&th4_mutex, NULL);
+
+
+    void* shmem_th1 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+    void* shmem_th2 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+    void* shmem_th3 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+    void* shmem_th4 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+
+    struct msg *msg_th1_write= malloc(sizeof(struct msg));
+ 	struct msg *msg_th2_write= malloc(sizeof(struct msg));
+ 	struct msg *msg_th3_write= malloc(sizeof(struct msg));
+    struct msg *msg_th4_write= malloc(sizeof(struct msg));
+
+    struct msg *msg_th1_read= malloc(sizeof(struct msg));
+ 	struct msg *msg_th2_read= malloc(sizeof(struct msg));
+ 	struct msg *msg_th3_read= malloc(sizeof(struct msg));
+    struct msg *msg_th4_read= malloc(sizeof(struct msg));
+
+    msg_th1_read->response = CLEAR;
+    msg_th2_read->response = CLEAR;
+    msg_th3_read->response = CLEAR;
+    msg_th4_read->response = CLEAR;
+
+    msg_th1_write->request = ACTIVE;
+    msg_th2_write->request = ACTIVE;
+    msg_th3_write->request = ACTIVE;
+    msg_th4_write->request = ACTIVE;
+
+    msg_th1_write->format = DEFAULT_LIGHTFORMAT;
+    msg_th2_write->format = DEFAULT_TEMPFORMAT;
+
+    //initial write out to thread shared memory
+	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
+	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
+	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
+    memcpy(shmem_th4, msg_th4_write, sizeof(struct msg));
+
+    /* create a first thread which executes thread1_fnt(&x) */
+
+    if(pthread_create(&thread1, NULL, (void *)thread1_fnt, shmem_th1)) {
+
+        fprintf(stderr, "Error creating Thread 1\n");
+        return 1;
+    }
+
+    /* create a second thread which executes thread2_fnt(&x) */
+   	if(pthread_create(&thread2, NULL, (void *)thread2_fnt, shmem_th2)) {
+
+        fprintf(stderr, "Error creating Thread 2\n");
+        return 1;
+    }
+
+        /* create a second thread which executes thread2_fnt(&x) */
+   	if(pthread_create(&thread3, NULL, (void *)thread3_fnt, shmem_th3)) {
+
+        fprintf(stderr, "Error creating Thread 3\n");
+        return 1;
+    }
+
+            /* create a second thread which executes thread2_fnt(&x) */
+    if(pthread_create(&thread4, NULL, (void *)thread4_fnt, shmem_th4)) {
+
+        fprintf(stderr, "Error creating Thread 4\n");
+        return 1;
+    }
+
+    int i=0;
+
+    char logs[5*LOG_SIZE_MAX];
+    int close = 0; //DO NOT TOUCH THIS VARIABLE. MODIFY HALT INSTEAD;
+    while(!close)
+    {
+        i++; //increment the loop counter
+
+        if(halt==ACTIVE)
+        {
+            close = ACTIVE;
+            msg_th1_write->close = ACTIVE;
+            msg_th2_write->close = ACTIVE;
+            msg_th3_write->close = ACTIVE;
+            msg_th4_write->close = ACTIVE;
+        }
+
+    	pthread_mutex_lock(&th1_mutex);
+		msgcpy(msg_th1_read, shmem_th1);
+	    if(msg_th1_read->response==ACTIVE)
+	    {
+	    	msg_th1_write->response = CLEAR;
+	    	msg_th1_read->response = CLEAR;
+	    	strcpy(logs,msg_th1_read->data);
+            #if SENSOR_OUTPUT == ON
+                sync_printf("Light sensor value %d: %.5lf lux\n", 
+                    i,
+                    msg_th1_read->sensorvalue);
+            #endif
+	    	msgcpy(shmem_th1, msg_th1_write);
+	    }
+	    pthread_mutex_unlock(&th1_mutex);
+
+    	pthread_mutex_lock(&th2_mutex);
+	   	msgcpy(msg_th2_read, shmem_th2);
+	    if(msg_th2_read->response==ACTIVE && msg_th1_read->request==CLEAR)
+	    {
+	    	msg_th2_write->response = CLEAR;
+	    	msg_th2_read->response = CLEAR;
+
+	    	strcat(logs,msg_th2_read->data);
+            #if SENSOR_OUTPUT == ON
+                sync_printf("Temp sensor value %d: %.4f deg %c\n", 
+                    i,
+                    msg_th2_read->sensorvalue,
+                    msg_th2_read->format);
+            #endif
+	    	msgcpy(shmem_th2, msg_th2_write);
+	    }
+	    pthread_mutex_unlock(&th2_mutex);
+
+        pthread_mutex_lock(&th4_mutex);
+        msgcpy(msg_th4_read, shmem_th4);
+        if(msg_th4_read->response==ACTIVE && msg_th4_read->request==CLEAR)
+        {
+            msg_th4_write->response = CLEAR;
+            msg_th4_read->response = CLEAR;
+            switch(msg_th4_read->net_request)
+            {
+               case TEMP:
+                  msg_th4_write->net_response = msg_th2_read->sensorvalue;
+                  break; 
+               case LIGHT:
+                  msg_th4_write->net_response = msg_th1_read->sensorvalue;
+                  break; 
+               case DANI:
+                  msg_th4_write->net_response = (double)msg_th1_read->daynight;
+                  break;
+               default:
+                  msg_th4_write->net_response = -89.99; //invalid request
+                  break;
+            }
+            msg_th4_write->net_request = CLEAR;
+            strcat(logs,msg_th4_read->data);
+            msgcpy(shmem_th4, msg_th4_write);
+        }
+        pthread_mutex_unlock(&th4_mutex);
+
+    	pthread_mutex_lock(&th3_mutex);
+	   	msgcpy(msg_th3_read, shmem_th3);
+	    if(msg_th3_read->response==ACTIVE && msg_th3_read->request==CLEAR)
+	    {
+	    	msg_th3_write->response = CLEAR;
+	    	msg_th3_read->response = CLEAR;
+	    	strcpy(msg_th3_write->data,logs);
+	    	msgcpy(shmem_th3, msg_th3_write);
+	    }
+	    pthread_mutex_unlock(&th3_mutex);
+       // halt=1;
+	}
+
+
+    if(pthread_join(thread1, NULL)) {
+        sync_printf("Light Sensor Thread Exited Safely");
+    }
+
+    if(pthread_join(thread2, NULL)) {
+        sync_printf("Temp Sensor Thread Exited Safely");
+    }
+
+    if(pthread_join(thread3, NULL)) {
+        sync_printf("Logger Thread Exited Safely");
+    }
+
+    if(pthread_join(thread4, NULL)) {
+        sync_printf("Socket Thread Exited Safely");
+    }
+
+
+    free(msg_th1_write);
+ 	free(msg_th2_write);
+ 	free(msg_th3_write);
+    free(msg_th4_write);
+    free(msg_th1_read);
+ 	free(msg_th2_read);
+ 	free(msg_th3_read);
+    free(msg_th4_read);
+
+    munmap(shmem_th1, sizeof(struct msg));
+    munmap(shmem_th2, sizeof(struct msg));
+    munmap(shmem_th3, sizeof(struct msg));
+    munmap(shmem_th4, sizeof(struct msg));
+
+
+    sync_printf("Main Thread Exited Safely");
+
+    return 0;
+}
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​ADPS9301.h
+​ ​*​ ​@brief​ ​light sensor driver Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 i2c light sensor driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+#ifndef _ADPS9301_H_
+#define _ADPS9301_H_
+
+#include <stdint.h>
+
+#define BIT(n) (0x1U << (n))
+
+/* Command register bits */
+#define ADPS9301_CMD			BIT(7) /* Select command register. Must write as 1 */
+#define ADPS9301_WORD			BIT(5) /* I2C write/read: if 1 word, if 0 byte */
+#define ADPS9301_CLEAR			BIT(6) /* Interrupt clear. Clears pending interrupt */
+
+/* Register set */
+#define ADPS9301_CONTROL		0x00 /* Control of basic functions */
+#define ADPS9301_TIMING			0x01 /* Timing and gain register */
+#define ADPS9301_THRESHLOWLOW	0x02 /* Low byte of low interrupt threshold */
+#define ADPS9301_THRESHLOWHIGH	0x03 /* Low byte of low interrupt threshold */
+#define ADPS9301_THRESHHIGHLOW	0x04 /* Low byte of high interrupt threshold */
+#define ADPS9301_THRESHHIGHHIGH	0x05 /* Low byte of high interrupt threshold */
+#define ADPS9301_INTERRUPT		0x06 /* Interrupt control */
+#define ADPS9301_ID				0x0A /* Product ID (Test Reg)*/
+
+#define ADPS9301_CH0LOW			0x0C /* Low byte of ADC channel 0 */
+#define ADPS9301_CH0HIGH		0x0D /* High byte of ADC channel 0 */
+#define ADPS9301_CH1LOW			0x0E /* Low byte of ADC channel 1 */
+#define ADPS9301_CH1HIGH		0x0F /* High byte of ADC channel 1 */
+
+/* Power on/off value for ADPS9301_CONTROL register */
+#define ADPS9301_POWER_ON		0x03
+#define ADPS9301_POWER_OFF		0x00
+
+#define ADPS9301_GAIN_MASK		0x04
+#define ADPS9301_INTR_MASK   	0x04
+#define ADPS9301_TIMING_MASK	0x03
+
+/**
+​ ​*​ ​@brief​ ​get channel 0 of light sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_CH0(int addr, char* interface, int16_t* value);
+
+/**
+​ ​*​ ​@brief​ ​get channel 1 of light sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_CH1(int addr, char* interface, int16_t* value);
+
+/**
+​ ​*​ ​@brief​ ​get converted lux value of sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_lux(int addr, char* interface, double* value);
+
+/**
+​ ​*​ ​@brief​ ​power on sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_power_on(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​run tests for all sensors
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_run_everything(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​set sensor timing
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param msg to set timing to (two bits)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_set_timing(int addr, char* interface, uint8_t msg);
+
+/**
+​ ​*​ ​@brief​ ​get sensor timing
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param val pointer to pass data into
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_timing(int addr, char* interface, uint8_t* val);
+
+/**
+​ ​*​ ​@brief​ ​set high gain for sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_set_high_gain(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​set low gain for sensor
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_set_low_gain(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​set sensor integration time 
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param msg to set timing to (two bits)
+​ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_set_integ_time(int addr, char* interface, uint8_t msg);
+
+/**
+​ ​*​ ​@brief​ ​enable interrupt
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_enable_int(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​disable interrupt
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_disable_int(int addr, char* interface);
+
+/**
+​ ​*​ ​@brief​ ​get sensor id
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param value to pass data into
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_id(int addr, char* interface, uint8_t* value);
+
+/**
+​ ​*​ ​@brief​ ​set sensor thresholds
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param low threshold
+ * @param high threshold
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_set_thresholds(int addr, char* interface, uint16_t low, uint16_t high);
+
+/**
+​ ​*​ ​@brief​ ​get sensor thresholds
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param low threshold
+ * @param high threshold
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_get_thresholds(int addr, char* interface, uint16_t* low, uint16_t* high);
+
+/**
+​ ​*​ ​@brief​ ​write single register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param reg register to write to
+ * @param msg message to write
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_write_single(int addr, char* interface, char reg, char msg);
+
+/**
+​ ​*​ ​@brief​ ​write single register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ addr address of sensor
+ * @param interface of sensor, "dev/i2c-1", etc
+ * @param reg register to write to
+ * @param value value to read in
+ *
+​ ​*​ ​@return​ 0 if successful
+​ ​*/
+int ADPS9301_read_single(int addr, char* interface, char reg, uint8_t* value);
+
+#endif
+
+/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​driver_unit_test.c
+​ ​*​ ​@brief​ ​a simple driver unit test demonstrating working sensor drivers
+​ ​*
+​ ​*​ ​This​ ​is the project 1 i2c sensor driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include "ADPS9301.h"
+#include "TMP102.h"
+
+int main()
+{
+	int i=0;
+	int err = 0;
+
+	double lux;
+	float tempc, tempf;
+
+	err+=APDS9301_power_on(0x39,"/dev/i2c-1");
+
+	while(1)
+	{
+		i++; //counter
+		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
+		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &tempc);
+		err+=TMP102_get_temp_f(0x48,"/dev/i2c-1", &tempf);
+
+
+		printf("Light sensor value %d: %.5lf lux\n", i, lux);
+		printf("Temp sensor value %d: %.4f degrees Celcius \n", i, tempc);
+		printf("Temp sensor value %d: %.4f degrees Fahrenheit \n", i, tempf);
+
+		sleep(1);
+	}
+
+	return 0;
+}/*****************************************************************************
+​ ​*​ ​Copyright​ ​(C)​ ​2018 ​by​ Zach Farmer
+​ ​*
+​ ​*​ ​Redistribution,​ ​modification​ ​or​ ​use​ ​of​ ​this​ ​software​ ​in​ ​source​ ​or​ ​binary
+​ ​*​ ​forms​ is permitted under the Zach Literally Could Not Care Less If You 
+ * Paid Him To License and GNU GPL.
+ *
+ * ​Zach Farmer ​is not liable for any misuse of this material.
+​ ​*
+*****************************************************************************/
+/**
+​ ​*​ ​@file​ ​i2c_driver.c
+​ ​*​ ​@brief​ ​i2c driver Project 1
+​ ​*
+​ ​*​ ​This​ ​is the project 1 i2c base driver
+​ ​*
+​ ​*​ ​@author​ ​Zach Farmer
+​ ​*​ ​@date​ ​Mar 16 2018
+​ ​*
+​ ​*/
+
+#include <stdio.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include "i2c_driver.h"
+
+/**
+​ ​*​ ​@brief​ ​open a hardware location
+​ ​*
+​ ​*​ ​opens a hardware location
+​ ​*
+​ ​*​ ​@param​ ​filename the name of the hardware /dev file
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int i2c_open(char* filename) {
+    int i2c_file;
+
+    // Open a connection to the I2C userspace control file.
+    if ((i2c_file = open(filename, O_RDWR)) < 0) {
+        perror("Unable to open i2c control file");
+        return -1;
+    }
+
+    return i2c_file;
+}
+
+/**
+​ ​*​ ​@brief​ ​close a hardware location
+​ ​*
+​ ​*​ ​closes a hardware location
+​ ​*
+​ ​*​ ​@param​ ​i2c file int
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int i2c_close(int i2c_file) {
+    // close connection to the I2C userspace control file.
+    return close(i2c_file);
+}
+
+/**
+​ ​*​ ​@brief set a single i2c register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param value value to write to reg
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int set_i2c_register(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char value) {
+
+    unsigned char outbuf[2];
+    struct i2c_rdwr_ioctl_data packets;
+    struct i2c_msg messages[1];
+
+    messages[0].addr  = addr;
+    messages[0].flags = 0;
+    messages[0].len   = sizeof(outbuf);
+    messages[0].buf   = outbuf;
+
+    outbuf[0] = reg;
+
+    outbuf[1] = value;
+
+    packets.msgs  = messages;
+    packets.nmsgs = 1;
+    if(ioctl(file, I2C_RDWR, &packets) < 0) {
+        perror("Unable to send data");
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+​ ​*​ ​@brief set a double (16bit) i2c register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param lo byte to write to reg
+ * @param hi byte to write to reg
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int set_i2c_registers(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char lo,
+                            unsigned char hi) {
+
+    unsigned char outbuf[3];
+    struct i2c_rdwr_ioctl_data packets;
+    struct i2c_msg messages[2];
+
+    messages[0].addr  = addr;
+    messages[0].flags = 0;
+    messages[0].len   = sizeof(outbuf);
+    messages[0].buf   = outbuf;
+
+    outbuf[0] = reg;
+
+    outbuf[1] = lo;
+    outbuf[2] = hi;
+
+    packets.msgs  = messages;
+    packets.nmsgs = 1;
+
+    if(ioctl(file, I2C_RDWR, &packets) < 0) {
+        perror("Unable to send data");
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+​ ​*​ ​@brief repeated-start read a register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param val value pointer to read in from register
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int get_i2c_register_repstart(int file,
+                            unsigned char addr,
+                            unsigned char reg,
+                            unsigned char *val) {
+    //unsigned char inbuf, outbuf;
+    struct i2c_rdwr_ioctl_data packets;
+    struct i2c_msg messages[2];
+
+    messages[0].addr  = addr;
+    messages[0].flags = 0;
+    messages[0].len   = 2;//sizeof(outbuf);
+    messages[0].buf   = &reg;
+
+    messages[1].addr  = addr;
+    messages[1].flags = I2C_M_RD;
+    messages[1].len   = 1;//sizeof(inbuf);
+    messages[1].buf   = val;//&inbuf;
+
+
+    packets.msgs      = messages;
+    packets.nmsgs     = 2;
+    if(ioctl(file, I2C_RDWR, &packets) < 0) {
+        perror("Unable to send data");
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+​ ​*​ ​@brief read a multiple-byte register
+​ ​*
+​ ​*
+​ ​*​ ​@param​ ​file file int, produced by open
+ * @param addr address of device
+ * @param reg register on device
+ * @param count number of bytes to read
+ * @param vals value pointer to read in from register
+​ *
+​ ​*​ ​@return​ void
+​ ​*/
+int get_i2c_registers(int file,
+                    unsigned char addr,
+                    unsigned char reg,
+                    unsigned char count,
+                    unsigned char *vals) {
+    //unsigned char inbuf, outbuf;
+    struct i2c_rdwr_ioctl_data packets;
+    struct i2c_msg messages[2];
+
+    /*
+     * can read multiple registers here
+     */
+    //outbuf = reg;
+    messages[0].addr  = addr;
+    messages[0].flags = 0;
+    messages[0].len   = 2;//sizeof(outbuf);
+    messages[0].buf   = &reg;
+
+    /* The data will be returned in this structure */
+    messages[1].addr  = addr;
+    messages[1].flags = I2C_M_RD | I2C_M_NOSTART;
+    messages[1].len   = count;//sizeof(inbuf);
+    messages[1].buf   = vals;//&inbuf;
+
+    /* Send the request to the kernel and receive result*/
+    packets.msgs      = messages;
+    packets.nmsgs     = 2;
+    if(ioctl(file, I2C_RDWR, &packets) < 0) {
+        perror("Unable to send data");
+        return 1;
+    }
+    //*val = inbuf;
+
+    return 0;
+}#include <stdio.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include "i2c_driver.h"
+#include "TMP102.h"
+
+static int TMP102_get_raw_temp(int addr, char* interface, uint16_t* value)
+{
+    unsigned char bytes[2];
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_TEMP_REG, 2, bytes)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+	*value = (bytes[0] << 4) | (bytes[1] >> 4);
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+int TMP102_get_temp_c(int addr, char* interface, float* value)
+{
+    uint16_t temp_raw;
+    int ret = TMP102_get_raw_temp(addr, interface, &temp_raw);
+
+    *value = ((float)(temp_raw))/16; //divide by 16, as LSB resolution of sensor is (0.0625 = 2^-4 = 1/16) deg C 
+    return ret;
+}
+
+int TMP102_get_temp_f(int addr, char* interface, float* value)
+{
+    float temp_cel;
+    int ret = TMP102_get_temp_c(addr, interface, &temp_cel);
+
+    *value = (temp_cel * 1.8) + 32.0; //conversion from celsius to fahrenheit;
+
+    return ret;
+}
+
+
+int TMP102_get_temp_k(int addr, char* interface, float* value)
+{
+    float temp_cel;
+    int ret = TMP102_get_temp_c(addr, interface, &temp_cel);
+
+    *value = temp_cel + 273.15; //conversion from celsius to kelvin;
+
+    return ret;
+}
+
+int TMP102_get_tlow(int addr, char* interface, uint8_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_T_LO_REG, 1, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+int TMP102_get_thigh(int addr, char* interface, uint8_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_T_HI_REG, 2, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+
+int TMP102_get_config(int addr, char* interface, uint16_t* value)
+{
+    unsigned char byte;
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(get_i2c_registers(i2c_file, addr, TMP102_CONF_REG, 1, &byte)) {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    *value = byte;
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+int TMP102_set_config(int addr, char* interface, uint16_t value)
+{
+    unsigned char bytes[2];
+
+    bytes[0] = (unsigned char) value;
+    bytes[1] = (unsigned char) (value >> 8);
+
+    int i2c_file = i2c_open(interface);
+
+    //get bytes
+    if(set_i2c_registers(i2c_file, addr, TMP102_CONF_REG, bytes[0], bytes[1]))
+    {
+        return i2c_close(i2c_file)-2; // ret -2 if unable to get register, -3 if close fails also
+    }
+
+    return i2c_close(i2c_file); //ret 0 if all good, -1 if unable to close
+}
+
+
+int TMP102_shutdown_on(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|TMP102_CONF_SHUTDOWN);
+    
+    return 0;
+}
+
+int TMP102_shutdown_off(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(~TMP102_CONF_SHUTDOWN));
+
+    return 0;
+}
+
+int TMP102_EM_on(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|TMP102_CONF_EM);
+
+    return 0;
+}
+
+ int TMP102_EM_off(int addr, char* interface)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(~TMP102_CONF_EM));
+
+    return 0;
+}
+
+int TMP102_set_res(int addr, char* interface, char res)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_RES|res << 5));
+
+    return 0;
+}
+
+int TMP102_set_conv(int addr, char* interface, char conv)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_CONVRATE|(conv << 14)));
+
+    return 0;
+}
+
+int TMP102_set_fault(int addr, char* interface, char fault)
+{
+    uint16_t val;
+
+    TMP102_get_config(addr, interface, &val);
+    TMP102_set_config(addr, interface, val|(TMP102_CONF_FAULT|(fault << 3)));
+
+    return 0;
+}
+
+

@@ -71,7 +71,7 @@
 #define FAKE        'U'
 
 #define PORT 55171
-#define HOSTNAME "ubuntu"
+#define HOSTNAME "beaglebone"
 
 #define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
 #define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
