@@ -33,12 +33,12 @@ int main()
 	double lux;
 	float tempc, tempf;
 
-	err+=APDS9301_power_on(0x39,"/dev/i2c-1");
+	err+=ADPS9301_power_on(0x39,"/dev/i2c-1");
 
 	while(1)
 	{
 		i++; //counter
-		err+=APDS9301_get_lux(0x39,"/dev/i2c-1", &lux);
+		err+=ADPS9301_get_lux(0x39,"/dev/i2c-1", &lux);
 		err+=TMP102_get_temp_c(0x48,"/dev/i2c-1", &tempc);
 		err+=TMP102_get_temp_f(0x48,"/dev/i2c-1", &tempf);
 

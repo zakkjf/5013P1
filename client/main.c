@@ -35,7 +35,7 @@
   
 
 #define PORT 55171
-#define HOSTNAME "ubuntu"
+#define HOSTNAME "beaglebone"
 
 /**
 ​ ​*​ ​@brief​ ​prompt, prints options for request from server
@@ -137,4 +137,5 @@ int main(void)
     printf("ECEN 5013 Project1 Socket Client\n\n");
 
     client(PORT, HOSTNAME);
+    return 0;
 }
