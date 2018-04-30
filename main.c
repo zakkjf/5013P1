@@ -32,92 +32,120 @@
 #include <stdarg.h>
 #include <sys/syscall.h>
 #include <time.h>
+#include <math.h>
 #include <sys/mman.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> 
-#include "ADPS9301.h"
-#include "TMP102.h"
+#include <mqueue.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <string.h>
+
+#include "uart_driver.h"
+#include "parser.h"
+#include "gps/gps_decoder.h"
+#include "gps/gps_calc.h"
+#include "gps/gps_dist.h"
 #include "main.h"
 
-#define DEBUG OFF
-#define SENSOR_OUTPUT OFF
+#define DEBUG ON
+#define HEARTBEAT_TEST OFF
+#define THREAD_TIMEOUT_TEST OFF
 #define LOGPATH "log.txt"
 
-#define MSG_SIZE_MAX 128
-#define LOG_SIZE_MAX 256
+#define MSG_SIZE_MAX 101
 
-#define TEMP_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
-#define LIGHT_LOGGING_INTERVAL 1000 //logging interval in ms DO NOT SET BELOW 50 OR YOU ARE GONNA BREAK SHIT
+#define USE_TCP 0
 
-#define DEFAULT_LIGHTFORMAT LUMEN
-#define DEFAULT_TEMPFORMAT CELSIUS
+#define FAKE_UART 0 //switch on this mode if UART is being difficult
+#define FAKE_UART_DATA "TIVA:01:1:12376$GPGGA,215907.00,4000.43805,N,10515.80958,W,1,04,9.85,1638.9,M,-21.3,M,,*5C\n\r" //MUST MATCH MSG_LEN!!!
 
 /*DON'T MESS WITH ANYTHING BELOW THIS LINE*/
 /*--------------------------------------------------------------*/
+
+#define SRV_QUEUE_NAME "/testqueue6"
+#define LOG_SIZE_MAX 256
+#define QUEUE_SIZE_MAX 20
+#define MSG_BUFFER_SIZE LOG_SIZE_MAX + QUEUE_SIZE_MAX
+#define PERMISSION 0660
+
 #define ON 1
 #define OFF 0
 #define ACTIVE ON
 #define CLEAR OFF
 
-#define DANI '2'
-#define TEMP '1'
-#define LIGHT '0'
-
-#define FAHRENHEIT  'F'
-#define CELSIUS     'C'
-#define KELVIN      'K'
-#define LUMEN       'L'
-#define FAKE        'U'
-
-#define PORT 55171
 #define HOSTNAME "beaglebone"
 
-#define TEMP_SAMPLING_INTERVAL 1 //sample rate of temp sensor in ms
-#define LIGHT_SAMPLING_INTERVAL 1 //sample rate of light sensor in ms
+#define SER_INTERFACE "/dev/ttyO1"
 
-#define I2C_INTERFACE "/dev/i2c-1"
-#define LIGHT_SENSOR_ADDR 0x39
-#define TEMP_SENSOR_ADDR 0x48
+#define NUM_THREADS 3
+
+pthread_t comm_thread;
+pthread_t log_thread;
+pthread_t navmath_thread;
+
+pthread_mutex_t printf_mutex;
+pthread_mutex_t buf_mutex;
+pthread_mutex_t log_mutex;
+
+char bufmsg[MSG_SIZE_MAX];
+char alive[NUM_THREADS];
+
+char board[4];
+char id, version;
+uint32_t heartcounter;
+imu_raw_t imu;
+gps_raw_t gps;
 
 FILE *fp;
 
-int halt;
-
-pthread_t thread1;
-pthread_t thread2;
-pthread_t thread3;
-pthread_t thread4;
-
-pthread_mutex_t printf_mutex;
-pthread_mutex_t log_mutex;
-pthread_mutex_t sensor_mutex;
-pthread_mutex_t th1_mutex;
-pthread_mutex_t th2_mutex;
-pthread_mutex_t th3_mutex;
-pthread_mutex_t th4_mutex;
-pthread_mutex_t cpy_mutex;
-
 /**
-​ ​*​ ​@brief​ ​thread-safe message copy
+​ ​*​ ​@brief​ ​Synchronous logging call
 ​ ​*
-​ ​*​ ​Mutexes printf for asynchronous call protection
- * among multiple threads
+​ ​*​ ​logs synchonously to specified file
 ​ ​*
-​ ​*​ ​@param​ ​dest destination message
- ​*​ ​@param​ ​src source message
- ​*​ ​@param​ ​mutex the mutex used
- * @param ... variadic arguments for print (char *, char, etc)
+​ ​*​ ​@param​ ​filename of log
+ * @param name of thread thread currently logging
+ * @param log text to log
 ​ *
 ​ ​*​ ​@return​ void
 ​ ​*/
-void* msgcpy( void* dest, const void* src)
+int sync_logwrite(char* filename,char* log)
 {
-	pthread_mutex_lock(&cpy_mutex);
-	memcpy(dest, src, sizeof(struct msg));
-	pthread_mutex_unlock(&cpy_mutex);
-	return dest;
+	time_t timer;
+	char timebuf[25];
+	//int tid, pid;
+	struct tm* time_inf;
+
+    pthread_mutex_lock(&log_mutex);
+
+	fp = fopen (filename, "a");
+
+	time(&timer);
+
+	time_inf = localtime(&timer);
+	strftime(timebuf, 25, "%m/%d/%Y %H:%M:%S", time_inf);
+
+	//tid = syscall(SYS_gettid);
+	//pid = getpid();
+
+	//fprintf(fp,"%s Linux Thread ID: %d POSIX Thread ID: %d Log:%s",timebuf,tid,pid,log);
+
+	fprintf(fp,"%s : %s",timebuf,log);
+
+	//Flush file output
+	fflush(fp);
+
+	//Close the file
+	fclose(fp);
+    pthread_mutex_unlock(&log_mutex);
+
+    return 0;
 }
+
+
 /**
 ​ ​*​ ​@brief​ ​Synchronous encapsulator for printf
 ​ ​*
@@ -142,644 +170,296 @@ void sync_printf(const char *format, ...)
 }
 
 /**
-​ ​*​ ​@brief​ ​Signal handler for this program
+​ ​*​ ​@brief​ clientside/childside mQueue message function
 ​ ​*
-​ ​*​ ​handles SIGUSR1 and SIGUSR2 signals,
- * which exit all child threads
+​ ​*​ ​client side of Mqueue IPC
 ​ ​*
-​ ​*​ ​@param​ ​sig received signal
-​ *
-​ ​*​ ​@return​ void
+​ ​*​ ​@param​ message message to send to server/parent
+ *
+​ ​*​ ​@return​ 0 if successful
 ​ ​*/
-void sig_handler(int sig)
+int async_log(const char *format, ...)
 {
-    halt = ACTIVE;
-}
+    //sync_printf("Client Thread: Active\n");
+    char logbuf [LOG_SIZE_MAX];
+    mqd_t qd_server;   // queue descriptors
 
-char* log_str(source_t source, int level, char* msg)
-{
-	char* buffer = malloc(sizeof(char)*MSG_SIZE_MAX);
-    time_t timer;
-    char timebuf[25];
-    struct tm* time_inf;
 
-    time(&timer);
+    va_list args;
+    va_start(args, format);
+    // create the client queue for receiving messages from server
+    vsprintf(logbuf, format, args);
+    va_end(args);
+    //open server message queue from client
+    if((qd_server = mq_open(SRV_QUEUE_NAME, O_WRONLY)) == -1) {
+        sync_printf("ERROR Client: mq_open(server)\n");
+        return 1;
+    }
 
-    time_inf = localtime(&timer);
-    strftime(timebuf, 25, "%m/%d/%Y %H:%M:%S", time_inf);
-
-    char* name;
-	switch(source)
-	{
-	   case LIGHT_THR  :
-	      name = "Light Sensor Thread";
-	      break; 
-	   case TEMP_THR  :
-	      name = "Temp Sensor Thread";
-	      break; 
-	   case SOCKET_THR :
-	      name = "Socket Thread";
-	      break; 
-	   case MASTER_THR  :
-	      name = "Master Thread";
-	      break; 
-   	   default :
-	      name = "Other";
+	//send string from message struct
+	if(mq_send(qd_server, logbuf, LOG_SIZE_MAX/4, 0) == -1) {
+	    sync_printf("ERROR Client: Not able to send message to server\n");
+	    perror("ERROR");
 	}
 
-    sprintf(buffer, "%s, Level %d, Time: %s, Message:%s\n",
-    		name,
-    		level,
-    		timebuf,
-    		msg);
-
-    return buffer;
-}
-
-/**
-​ ​*​ ​@brief​ ​Synchronous logging call for thread and POSIX Ids
-​ ​*
-​ ​*​ ​@param​ ​filename filename of log
- * @param thread name of present thread (as char *)
-​ *
-​ ​*​ ​@return​ void
-​ ​*/
-int sync_log_id(char* filename, char* thread)
-{
-    pthread_mutex_lock(&log_mutex);
-    int tid, pid;
-    tid = syscall(SYS_gettid);
-    pid = getpid();
-
-	fp = fopen (filename, "a");
-
-	fprintf(fp,"%s", thread);
-	fprintf(fp,"%s"," : ");
-	fprintf(fp,"Linux Thread ID: %d POSIX Thread ID: %d",tid,pid);
-	fprintf(fp,"%s","\n");
-	//Flush file output
-	fflush(fp);
-
-	//Close the file
-	fclose(fp);
-    pthread_mutex_unlock(&log_mutex);
-
     return 0;
 }
 
+
 /**
-​ ​*​ ​@brief​ ​Synchronous logging call
+​ ​*​ ​@brief​ serverside/parentside mQueue log thread
 ​ ​*
-​ ​*​ ​logs synchonously to specified file
+​ ​*​ ​server side of Mqueue IPC
 ​ ​*
-​ ​*​ ​@param​ ​filename of log
- * @param name of thread thread currently logging
- * @param log text to log
-​ *
-​ ​*​ ​@return​ void
+​ ​*​ ​@param​ message message response to client/child
+ *
+​ ​*​ ​@return​ 0 if successful
 ​ ​*/
-int sync_logwrite(char* filename,char* log)
+
+void *logging_th()
 {
-    pthread_mutex_lock(&log_mutex);
+ 	mqd_t qd_server;   // queue descriptors
 
-	fp = fopen (filename, "a");
+    sync_printf("Logging Thread: Active\n");
 
-	fprintf(fp,"%s", log);
+    struct mq_attr attr;
 
-	//Flush file output
-	fflush(fp);
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = QUEUE_SIZE_MAX;
+    attr.mq_msgsize = MSG_BUFFER_SIZE;
+    attr.mq_curmsgs = 0;
 
-	//Close the file
-	fclose(fp);
-    pthread_mutex_unlock(&log_mutex);
+    if((qd_server = mq_open(SRV_QUEUE_NAME, O_RDONLY | O_CREAT, PERMISSION, &attr)) == -1) {
+        sync_printf("ERROR Server: mq_open(server)\n");
+        //return 1;
+    }
+    
+    char buffer [MSG_BUFFER_SIZE];
+    //this part could be looped for multiple clients
+    while(1) {
 
+        // get the string from client
+        alive[2]++;
+        if(mq_receive(qd_server, buffer, MSG_BUFFER_SIZE, NULL) == -1) {
+            sync_printf("ERROR Server: mq_receive\n");
+            perror("ERROR");
+            //return 1;
+        }
+
+		sync_logwrite(LOGPATH,buffer);
+
+        #if DEBUG
+        	sync_printf("%s\n", buffer); //show log in terminal
+        #endif
+
+    }
+
+    sync_printf("Server: Exiting\n");
     return 0;
 }
-/**
-​ ​*​ ​@brief​ ​child thread 1
-​ ​*
-​ ​*​ ​This child thread sorts an input random text file
- * from a doubly linked list and prints any characters
- * occurring more than 3 times to the console
-​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading and logging
-​ *
-​ ​*​ ​@return​ void
-​ ​*/
-void *thread1_fnt(void* ptr)
+
+void *navmath_th()
 {
-    //
-	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = LIGHT_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
-	int logcount=0;
-    int err = 0;
-    double lux;
-    //char chbuf[20];
-    //double luxprev;
-    //char nd; //night or day
-    while(1)
-    {
-    	logcount++;
-        
-        if(received->format==LUMEN)
-        {
-            pthread_mutex_lock(&sensor_mutex);
-            if(logcount==1)
-            {
-                err+=ADPS9301_power_on(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //only power on on the first loop
-                //ADPS9301_run_everything(LIGHT_SENSOR_ADDR,I2C_INTERFACE); //run all the operations as required
-            }
-           // luxprev=lux;
-            err+=ADPS9301_get_lux(LIGHT_SENSOR_ADDR,I2C_INTERFACE, &lux); //only light format
-            pthread_mutex_unlock(&sensor_mutex);
-/*
-            if((lux-luxprev)>5)
-            {
-                strcat(chbuf,"SUDDEN CHANGE"); // sudden change of more than 5 lux
-            }
-            */
-        }
-        if(received->format==FAKE)
-        {
-            lux = logcount%20; //fake some really rapidly changing lux data
-        }
-/*
-        if(lux>2) //day or night
-        {
-            nd  = 'D';
-            strcat(chbuf,"Day");
-        }
-        else
-        {
-            nd  = 'N';
-            strcat(chbuf,"Night");
-        }
-*/
-        //sync_printf("Light sensor value %d: %.5lf lux\n", logcount, lux);
-    	pthread_mutex_lock(&th1_mutex);
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
-	    {
-            received->sensorvalue = lux;
-			received->response = ACTIVE;
-			received->request = CLEAR;
-           // received->daynight = nd;
-			if(logcount%LIGHT_LOGGING_INTERVAL==0)
+	async_log("Navmath Thread: Active\n");
+	double apes[3] = {40.007035, -105.263579,1635.7}; //location fix of comparison target
+	uint32_t catchcounter =1;
+	gps_raw_t prevfix;
+	double dir_to_target, my_dir, diff;
+
+	while(1)
+	{
+		#if THREAD_TIMEOUT_TEST
+			sleep(2);
+		#endif
+		sleep(1);
+		pthread_mutex_lock(&buf_mutex);
+		if(catchcounter > heartcounter) //make sure heartbeat is still running
+		{
+			async_log("COMM ERROR: Missed heartbeat %d\n", catchcounter);
+		}
+		else
+		{
+
+			split_packet(bufmsg, board, &id, &version, &imu, &gps);
+
+			async_log("Board Type: %s ID: %d Firmware version: %d.\n",board, id, version);
+
+			//printf("%d\n",imu.z_accel);
+			if(gps.fixq == 0.00f) //tiva is sending no gps data.
 			{
-                char logbuf[MSG_SIZE_MAX];
-                //sprintf(logbuf,"Sensor value: %.5lf lux %c MESSAGES: %s",lux, received->format, chbuf);
-                sprintf(logbuf,"Sensor value: %.5lf lux %c",lux, received->format);
-				strcpy(received->data,log_str(LIGHT_THR, 2, logbuf));
+				//no fix
+				async_log("No GPS available. Waiting for fix...\n"); //fix quality ==0 means sensor fault or no fix data available
 			}
-			msgcpy(ptr,received);
-	    }
-		pthread_mutex_unlock(&th1_mutex);
-
-        if(received->close == ACTIVE) //recieved close command
-        {
-            free(received);
-            //sync_printf("exiting");
-            pthread_exit(NULL);
-            return NULL;
-        }
-		nanosleep(&tim, NULL);
-    }
-
-    free(received);
-   	return NULL;
-}
-
-
-/**
-​ ​*​ ​@brief​ ​child thread 2
-​ ​*
-​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
-​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
-​ *
-​ ​*​ ​@return​ void
-​ ​*/
-void *thread2_fnt(void* ptr)
-{
-	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
-	//char poo;
-	//poo = 0;
-	 //char doo[5];
-	int logcount=0;
-    float temp;
-    while(1)
-    {
-    	logcount++;
-        pthread_mutex_lock(&sensor_mutex);
-        switch(received->format)
-        {
-           case CELSIUS:
-              TMP102_get_temp_c(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
-              break; 
-           case FAHRENHEIT:
-              TMP102_get_temp_f(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
-              break; 
-           case KELVIN:
-              TMP102_get_temp_k(TEMP_SENSOR_ADDR,I2C_INTERFACE, &temp);
-              break;
-           case FAKE:
-              temp = logcount%150-25; //fake some *really* rapidly changing temperatures for testing
-              break;
-           default :
-              temp = -99.99;  //ERROR, INVALID FORMAT
-        }
-        pthread_mutex_unlock(&sensor_mutex);
-    	//sprintf(doo, "%d", poo);
-    	pthread_mutex_lock(&th2_mutex);
-    	//poo++;
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
-	    {
-			received->response = ACTIVE;
-			received->request = CLEAR;
-            received->sensorvalue = temp;
-			if(logcount%TEMP_LOGGING_INTERVAL==0)
+			else if(gps.fixq<50) //if fixq is greater than 50, there is no way the fix readings can be accurate
 			{
-                char logbuf[MSG_SIZE_MAX];
-                sprintf(logbuf,"Sensor value: %.4lf deg %c",temp,received->format);
-				strcpy(received->data,log_str(SOCKET_THR, 2, logbuf));
+				//full fix
+				async_log("Fix Quality: %f\n", gps.fixq); //fix quality
+					//run_distances(gps,0); //just show distance/heading to APES classroom
+				async_log("Distance to the APES lecture hall %f meters\n", distance(apes[0], apes[1], apes[3], gps.lat_dec_deg, gps.lon_dec_deg, gps.altitude_m, KILOM, 0)*1000);
+				dir_to_target = angle(gps.lat_dec_deg, gps.lon_dec_deg,apes[0], apes[1]);
+				async_log("Heading to the APES lecture hall %f degrees CW of N\n",dir_to_target);
+				my_dir = angle(prevfix.lat_dec_deg, prevfix.lon_dec_deg,gps.lat_dec_deg, gps.lat_dec_deg); //take angle between consecutive fixes for present direction (ONLY WORKS IF YOU ARE MOVING QUICKLY);
+				diff = dir_to_target-my_dir;
+				async_log("Pointing within %f degrees of target",diff);
+				memcpy(&prevfix,&gps,sizeof(gps_raw_t)); //copy data into prevdata packet
+				async_log("Current time: %02d:%02d:%02d\n",(gps.utc_h+6)%24,gps.utc_m,gps.utc_s); //convert UTC to CO time
 			}
-	    	//sync_printf("My 1 Counter:%d\n",received->counter);
-			msgcpy(ptr,received);
-	    }
-		pthread_mutex_unlock(&th2_mutex);
+			else
+			{
+				//time only
+				async_log("Fix quality too poor for fix");
+				async_log("Fix Quality: %f\n", gps.fixq); //fix quality
+				async_log("Current time: %02d:%02d:%02d\n",(gps.utc_h+6)%24,gps.utc_m,gps.utc_s); //convert UTC to CO time
+			}
 
-        if(received->close == ACTIVE)//recieved close command
-        {
-            free(received);
-            pthread_exit(NULL);
-            return NULL;
-        }
 
-		nanosleep(&tim, NULL);
-    }
-    free(received);
-   	return NULL;
+			//antenna direction (MPU data)
+			if(imu.z_accel>0)
+			{
+				async_log("FIX LIKELY: GPS antenna is pointing above the horizon.\n");
+			}
+			else
+			{
+				async_log("FIX UNLIKELY: GPS antenna is pointing below the horizon.\n");
+			}
+		}
+		pthread_mutex_unlock(&buf_mutex);
+		catchcounter= heartcounter+1;
+		alive[1]++;
+	}
+	return 0;
 }
 
-/**
-​ ​*​ ​@brief​ ​child thread 3: logger
-​ ​*
-​ ​*​ ​This child thread reports CPU utilization to the console on 100ms intervals
-​ ​*
-​ ​*​ ​@param​ ​nfo info struct containing filenames for reading usage stats
-​ *
-​ ​*​ ​@return​ void
-​ ​*/
-void *thread3_fnt(void* ptr)
+void *uart_commtask_th(void *ptr)
 {
-     //
-	struct msg *received = malloc(sizeof(struct msg));
-	struct timespec tim;
-	tim.tv_sec = 0;
-	tim.tv_nsec = 1000000L; //1ms sampling loop
-    while(1)
-    {
-    	pthread_mutex_lock(&th3_mutex);
-		msgcpy(received, ptr);	
-	    if(received->request == ACTIVE && received->response==CLEAR)
-	    {
-			received->response = ACTIVE;
-			received->request = CLEAR;
-			#if DEBUG == ACTIVE
-			sync_printf(received->data);//print the logs to terminal
-			#endif
-			sync_logwrite(LOGPATH,received->data);
-			msgcpy(ptr,received);
-	    }
-		pthread_mutex_unlock(&th3_mutex);
 
-        if(received->close == ACTIVE)
-        { //recieved close command
-            free(received);
-            pthread_exit(NULL);
-            return NULL;
-        }
-		nanosleep(&tim, NULL);
+    async_log("Comm Thread: Active\n");
+	//UART SETUP STUFF
+#if FAKE_UART == 0
+	char tempbuf[MSG_SIZE_MAX];
+	int fd = open(SER_INTERFACE, O_RDWR | O_NOCTTY | O_SYNC);
+	
+	if (fd < 0)
+	{
+	        //error_message ("error %d opening %s: %s", errno, SER_INTERFACE, strerror (errno));
+	        return NULL;
+	}
 
-    }
-	free(received);
-   	return NULL;
+	set_interface_attribs (fd, B9600, 0);  // set speed to 115,200 bps, 8n1 (no parity)
+	set_blocking (fd, 1);                // set blocking
+#endif
+
+	while(1)
+	{
+		#if HEARTBEAT_TEST
+			sleep(2); //throws off read rates to make heartbeat error show
+		#endif
+#if FAKE_UART == 0
+		get_uart_line(tempbuf,fd,MSG_SIZE_MAX);
+#endif
+		pthread_mutex_unlock(&buf_mutex);
+#if FAKE_UART
+		memcpy(bufmsg,FAKE_UART_DATA, MSG_SIZE_MAX);
+#else
+		memcpy(bufmsg,tempbuf, MSG_SIZE_MAX);
+#endif
+		heartcounter++;
+		alive[0]++;
+		pthread_mutex_unlock(&buf_mutex);
+	}
 }
 
-void *thread4_fnt(void* ptr)
+void *tcp_commtask_th(void *ptr)
 {
-    struct msg *received = malloc(sizeof(struct msg));
-    struct timespec tim;
-    tim.tv_sec = 0;
-    tim.tv_nsec = TEMP_SAMPLING_INTERVAL*1000000L; //1ms sampling loop
-    int logcount=0;
-    //float temp;
 
-    int sock_ret, newsock_ret, err_ret;;
-    unsigned int cli_length;
-    //char buffer[256];
-    char rx = -1;
-
-    struct sockaddr_in server_addr, cli_addr;
-
-    sync_printf("Server Thread: Active\n"); 
-
-    sock_ret = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_ret < 0) 
-    sync_printf("Server: ERROR opening socket");
-    bzero((char *) &server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(PORT);
-
-    if (bind(sock_ret, (struct sockaddr *) &server_addr,
-          sizeof(server_addr)) < 0) 
-          sync_printf("Server: ERROR on socket bind");
-
-    listen(sock_ret,5);
-    cli_length = sizeof(cli_addr);
-    
-    newsock_ret = accept(sock_ret, (struct sockaddr *) &cli_addr, &cli_length);
-    
-    if (newsock_ret < 0) 
-          sync_printf("Server: ERROR on accept");
-
-    while(1)
-    {
-        logcount++;
-
-        if(rx==-1)
-        {
-            err_ret = read(newsock_ret,&rx,sizeof(rx));
-            if (err_ret < 0) sync_printf("Server: ERROR reading from socket");
-            //sync_printf("Server: Received message: %d\n",rx);
-        }
-
-        pthread_mutex_lock(&th4_mutex);
-        msgcpy(received, ptr);  
-
-        if(received->request == ACTIVE && received->response==CLEAR)
-        {
-            received->response = ACTIVE;
-            received->request = CLEAR;
-            received->net_request = rx;
-            //received->sensorvalue = temp;
-            if(logcount%TEMP_LOGGING_INTERVAL==0)
-            {
-                char logbuf[MSG_SIZE_MAX];
-                sprintf(logbuf,"Socket Request from port %d: %d",PORT,rx);
-                strcpy(received->data,log_str(TEMP_THR, 2, logbuf));
-            }
-            msgcpy(ptr,received);
-        }
-        pthread_mutex_unlock(&th4_mutex);
-
-        sync_printf("%lf",received->net_response);
-        if(received->net_response !=0)
-        {
-            err_ret = write(newsock_ret,&(received->net_response),sizeof(double));
-            if (err_ret < 0) sync_printf("Server: ERROR writing to socket");
-
-            received->net_response = 0;
-            rx=-1;
-        }
-
-        if(received->close == ACTIVE)//recieved close command
-        {
-            free(received);
-            pthread_exit(NULL);
-            return NULL;
-        }
-
-        nanosleep(&tim, NULL);
-    }
-    free(received);
-    return NULL;
+	return 0;
 }
 
-/**
-​ ​*​ ​@brief​ main
-​ ​*
-​ ​*​ Begins logging, calls child threads, synchonously
- * waits until child thread completion to continue,
- * initializes signal handlers, mutexes, and info object
-​ ​*
-​ ​*​ ​
-​ ​*​ ​@return​ void
-​ ​*/
 int main()
 {
-    //attach signal handlers
-    if (signal(SIGUSR1, sig_handler) == SIG_ERR)
-        sync_printf("Error: Can't catch SIGUSR1\n");
-    siginterrupt(SIGUSR1, 0);
+	char prev[3];
+	char consec[3];
 
 
+	consec[0] = 0;
+	consec[1] = 0;
+	consec[2] = 0;
 
-    //initialize mutexes for logging and printing
-    pthread_mutex_init(&printf_mutex, NULL);
-    pthread_mutex_init(&log_mutex, NULL);
-    pthread_mutex_init(&sensor_mutex, NULL);
-    pthread_mutex_init(&th1_mutex, NULL);
-    pthread_mutex_init(&th2_mutex, NULL);
-    pthread_mutex_init(&th3_mutex, NULL);
-    pthread_mutex_init(&th4_mutex, NULL);
+	prev[0] = 0;
+	prev[1] = 0;
+	prev[2] = 0;
+
+	alive[0] = 1;
+	alive[1] = 1;
+	alive[2] = 1;
+	int i;
+
+	heartcounter =0;
+	pthread_mutex_init(&printf_mutex, NULL);
+	pthread_mutex_init(&buf_mutex, NULL);
+	pthread_mutex_init(&log_mutex, NULL);
 
 
-    void* shmem_th1 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    void* shmem_th2 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    void* shmem_th3 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-    void* shmem_th4 = mmap(NULL, sizeof(struct msg), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-
-    struct msg *msg_th1_write= malloc(sizeof(struct msg));
- 	struct msg *msg_th2_write= malloc(sizeof(struct msg));
- 	struct msg *msg_th3_write= malloc(sizeof(struct msg));
-    struct msg *msg_th4_write= malloc(sizeof(struct msg));
-
-    struct msg *msg_th1_read= malloc(sizeof(struct msg));
- 	struct msg *msg_th2_read= malloc(sizeof(struct msg));
- 	struct msg *msg_th3_read= malloc(sizeof(struct msg));
-    struct msg *msg_th4_read= malloc(sizeof(struct msg));
-
-    msg_th1_read->response = CLEAR;
-    msg_th2_read->response = CLEAR;
-    msg_th3_read->response = CLEAR;
-    msg_th4_read->response = CLEAR;
-
-    msg_th1_write->request = ACTIVE;
-    msg_th2_write->request = ACTIVE;
-    msg_th3_write->request = ACTIVE;
-    msg_th4_write->request = ACTIVE;
-
-    msg_th1_write->format = DEFAULT_LIGHTFORMAT;
-    msg_th2_write->format = DEFAULT_TEMPFORMAT;
-
-    //initial write out to thread shared memory
-	memcpy(shmem_th1, msg_th1_write, sizeof(struct msg));
-	memcpy(shmem_th2, msg_th2_write, sizeof(struct msg));
-	memcpy(shmem_th3, msg_th3_write, sizeof(struct msg));
-    memcpy(shmem_th4, msg_th4_write, sizeof(struct msg));
-
-    /* create a first thread which executes thread1_fnt(&x) */
-
-    if(pthread_create(&thread1, NULL, (void *)thread1_fnt, shmem_th1)) {
-
-        fprintf(stderr, "Error creating Thread 1\n");
-        return 1;
-    }
-
-    /* create a second thread which executes thread2_fnt(&x) */
-   	if(pthread_create(&thread2, NULL, (void *)thread2_fnt, shmem_th2)) {
-
-        fprintf(stderr, "Error creating Thread 2\n");
-        return 1;
-    }
-
-        /* create a second thread which executes thread2_fnt(&x) */
-   	if(pthread_create(&thread3, NULL, (void *)thread3_fnt, shmem_th3)) {
-
-        fprintf(stderr, "Error creating Thread 3\n");
-        return 1;
-    }
-
-            /* create a second thread which executes thread2_fnt(&x) */
-    if(pthread_create(&thread4, NULL, (void *)thread4_fnt, shmem_th4)) {
-
-        fprintf(stderr, "Error creating Thread 4\n");
-        return 1;
-    }
-
-    int i=0;
-
-    char logs[5*LOG_SIZE_MAX];
-    int close = 0; //DO NOT TOUCH THIS VARIABLE. MODIFY HALT INSTEAD;
-    while(!close)
-    {
-        i++; //increment the loop counter
-
-        if(halt==ACTIVE)
-        {
-            close = ACTIVE;
-            msg_th1_write->close = ACTIVE;
-            msg_th2_write->close = ACTIVE;
-            msg_th3_write->close = ACTIVE;
-            msg_th4_write->close = ACTIVE;
-        }
-
-    	pthread_mutex_lock(&th1_mutex);
-		msgcpy(msg_th1_read, shmem_th1);
-	    if(msg_th1_read->response==ACTIVE)
-	    {
-	    	msg_th1_write->response = CLEAR;
-	    	msg_th1_read->response = CLEAR;
-	    	strcpy(logs,msg_th1_read->data);
-            #if SENSOR_OUTPUT == ON
-                sync_printf("Light sensor value %d: %.5lf lux\n", 
-                    i,
-                    msg_th1_read->sensorvalue);
-            #endif
-	    	msgcpy(shmem_th1, msg_th1_write);
-	    }
-	    pthread_mutex_unlock(&th1_mutex);
-
-    	pthread_mutex_lock(&th2_mutex);
-	   	msgcpy(msg_th2_read, shmem_th2);
-	    if(msg_th2_read->response==ACTIVE && msg_th1_read->request==CLEAR)
-	    {
-	    	msg_th2_write->response = CLEAR;
-	    	msg_th2_read->response = CLEAR;
-
-	    	strcat(logs,msg_th2_read->data);
-            #if SENSOR_OUTPUT == ON
-                sync_printf("Temp sensor value %d: %.4f deg %c\n", 
-                    i,
-                    msg_th2_read->sensorvalue,
-                    msg_th2_read->format);
-            #endif
-	    	msgcpy(shmem_th2, msg_th2_write);
-	    }
-	    pthread_mutex_unlock(&th2_mutex);
-
-        pthread_mutex_lock(&th4_mutex);
-        msgcpy(msg_th4_read, shmem_th4);
-        if(msg_th4_read->response==ACTIVE && msg_th4_read->request==CLEAR)
-        {
-            msg_th4_write->response = CLEAR;
-            msg_th4_read->response = CLEAR;
-            switch(msg_th4_read->net_request)
-            {
-               case TEMP:
-                  msg_th4_write->net_response = msg_th2_read->sensorvalue;
-                  break; 
-               case LIGHT:
-                  msg_th4_write->net_response = msg_th1_read->sensorvalue;
-                  break; 
-               case DANI:
-                  msg_th4_write->net_response = (double)msg_th1_read->daynight;
-                  break;
-               default:
-                  msg_th4_write->net_response = -89.99; //invalid request
-                  break;
-            }
-            msg_th4_write->net_request = CLEAR;
-            strcat(logs,msg_th4_read->data);
-            msgcpy(shmem_th4, msg_th4_write);
-        }
-        pthread_mutex_unlock(&th4_mutex);
-
-    	pthread_mutex_lock(&th3_mutex);
-	   	msgcpy(msg_th3_read, shmem_th3);
-	    if(msg_th3_read->response==ACTIVE && msg_th3_read->request==CLEAR)
-	    {
-	    	msg_th3_write->response = CLEAR;
-	    	msg_th3_read->response = CLEAR;
-	    	strcpy(msg_th3_write->data,logs);
-	    	msgcpy(shmem_th3, msg_th3_write);
-	    }
-	    pthread_mutex_unlock(&th3_mutex);
-       // halt=1;
+	if(pthread_create(&log_thread, NULL, (void *)logging_th, NULL)) {
+		fprintf(stderr, "Error creating Thread 3\n");
+		return 1;
 	}
 
+#if USE_TCP
+	if(pthread_create(&comm_thread, NULL, (void *)tcp_commtask_th, NULL)) {
+		fprintf(stderr, "Error creating Comm Thread\n");
+		return 1;
+	}
+#else
+	if(pthread_create(&comm_thread, NULL, (void *)uart_commtask_th, NULL)) {
+		fprintf(stderr, "Error creating Comm Thread\n");
+		return 1;
+	}
+#endif
 
-    if(pthread_join(thread1, NULL)) {
-        sync_printf("Light Sensor Thread Exited Safely");
+	if(pthread_create(&navmath_thread, NULL, (void *)navmath_th, NULL)) {
+		fprintf(stderr, "Error creating Thread 3\n");
+		return 1;
+	}
+
+	//check if tasks are running
+	while(1)
+	{
+		sleep(5); //5 second timeout
+
+		for(i=0;i<3;i++)
+		{
+			prev[i]++;
+			if(alive[i]<=prev[i])
+			{
+				async_log("Task %d taking longer than expected, run %d, %d consec",i,alive[i], consec[i]);
+				//sync_printf("Task %d is taking longer than expected, task heartbeat %d\n",i,alive[i]);
+				alive[i] = prev[i]+1;
+				consec[i]++;
+				if(consec[i]>2)
+				{
+					async_log("It appears thread %d has frozen or crashed on task heartbeat %d",i,alive[i]);
+					sync_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+				}
+			}
+			else
+			{
+				consec[i] = 0;
+			}
+		}
+	}
+
+	if(pthread_join(log_thread, NULL)) {
+        printf("Socket Thread Exited Safely");
     }
 
-    if(pthread_join(thread2, NULL)) {
-        sync_printf("Temp Sensor Thread Exited Safely");
+    if(pthread_join(comm_thread, NULL)) {
+        printf("Socket Thread Exited Safely");
     }
 
-    if(pthread_join(thread3, NULL)) {
-        sync_printf("Logger Thread Exited Safely");
+    if(pthread_join(navmath_thread, NULL)) {
+        printf("Socket Thread Exited Safely");
     }
 
-    if(pthread_join(thread4, NULL)) {
-        sync_printf("Socket Thread Exited Safely");
-    }
-
-
-    free(msg_th1_write);
- 	free(msg_th2_write);
- 	free(msg_th3_write);
-    free(msg_th4_write);
-    free(msg_th1_read);
- 	free(msg_th2_read);
- 	free(msg_th3_read);
-    free(msg_th4_read);
-
-    munmap(shmem_th1, sizeof(struct msg));
-    munmap(shmem_th2, sizeof(struct msg));
-    munmap(shmem_th3, sizeof(struct msg));
-    munmap(shmem_th4, sizeof(struct msg));
-
-
-    sync_printf("Main Thread Exited Safely");
-
-    return 0;
+	return 0;
 }

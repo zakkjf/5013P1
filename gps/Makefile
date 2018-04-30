@@ -2,7 +2,7 @@ CFLAGS= -Wall -Werror -g
 LDFLAGS=-pthread -lm
 CC=gcc
 #arm-linux-gnueabihf-gcc
-OBJECTS=driver_unit_test.o i2c_driver.o ADPS9301.o TMP102.o
+OBJECTS=test.o gps_decoder.o gps_calc.o gps_dist.o
 TARGET=5013P1
 
 all: $(TARGET)
