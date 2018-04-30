@@ -1,26 +1,6 @@
 //Code adapted from GEODATASOURCE website.
 /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 /*::                                                                         :*/
-/*::  This routine calculates the distance between two points (given the     :*/
-/*::  latitude/lonitude of those points). It is being used to calculate     :*/
-/*::  the distance between two locations using GeoDataSource(TM) products.   :*/
-/*::                                                                         :*/
-/*::  Definitions:                                                           :*/
-/*::    South latitudes are negative, east lonitudes are positive           :*/
-/*::                                                                         :*/
-/*::  Passed to function:                                                    :*/
-/*::    lat1, lon1 = Latitude and lonitude of point 1 (in decimal degrees)  :*/
-/*::    lat2, lon2 = Latitude and lonitude of point 2 (in decimal degrees)  :*/
-/*::    unit = the unit you desire for results                               :*/
-/*::           where: 'M' is statute miles (default)                         :*/
-/*::                  'K' is kilometers                                      :*/
-/*::  Worldwide cities and other features databases with latitude lonitude  :*/
-/*::  are available at https://www.geodatasource.com                          :*/
-/*::                                                                         :*/
-/*::  For enquiries, please contact sales@geodatasource.com                  :*/
-/*::                                                                         :*/
-/*::  Official Web site: https://www.geodatasource.com                        :*/
-/*::                                                                         :*/
 /*::           GeoDataSource.com (C) All Rights Reserved 2017                :*/
 /*::                                                                         :*/
 /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
@@ -28,6 +8,12 @@
 #include <math.h>
 #include "gps_calc.h"
 
+/*​ ​@brief​ calculate angle clockwise from north between two decimal location points in degrees
+​ ​*
+​ ​*​ ​@param lat1, lon1 lat and long of source point
+ * @param lat2, lon2 lat and long of target point
+​ ​*
+​ ​*/
 double angle(double lat1, double lon1, double lat2, double lon2)
 {
 
@@ -45,6 +31,15 @@ double angle(double lat1, double lon1, double lat2, double lon2)
     return brng;
 }
 
+
+/*​ ​@brief​ calculate distance between two decimal location points in a chosen distance formula
+​ ​*
+​ ​*​ ​@param lat1, lon1, alt1 lat and long and altitude of source point
+ * @param lat2, lon2, alt2 lat and long and altitude of target point
+ * @param unit choose miles or kilometers for distance unit
+ * @param factor_in_alt choose whether to include altitude in calculation. Usually makes only a small difference and adds calculation time
+​ ​*
+​ ​*/
 double distance(double lat1, double lon1, double alt1, double lat2, double lon2, double alt2, char unit, char factor_in_alt)
 {
   double theta, dist;

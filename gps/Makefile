@@ -3,7 +3,7 @@ LDFLAGS=-pthread -lm
 CC=gcc
 #arm-linux-gnueabihf-gcc
 OBJECTS=test.o gps_decoder.o gps_calc.o gps_dist.o
-TARGET=5013P1
+TARGET=P2_GPS_UNIT_TESTS
 
 all: $(TARGET)
 	

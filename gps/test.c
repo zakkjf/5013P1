@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <assert.h>
 
+/**
+​ ​*​ ​@brief​ unit and functional tests for gps functions calc, dist, etc
+​ ​*
+​ ​*/
 int main(void)
 {
     //gps_raw_t gps_test;

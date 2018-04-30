@@ -6,6 +6,18 @@
 #include "gps/gps_decoder.h"
 #include "parser.h"
 
+
+/*​ ​@brief​ split a provided packet and parse into imu, gps, board, id, version
+​ ​*
+​ ​*​ ​@param str string to parse
+`* @param board var to read board type into
+ * @param id var to read id type into
+ * @param ver var to read version into
+ * @param imu struct to read imu data into
+ * @param gps struct to read gps data into
+​ ​*
+ * @return 0 if successful
+​ ​*/
 int split_packet(char* str, char* board, char* id, char* ver, imu_raw_t *imu, gps_raw_t *gps)
 {
     char *r = strdup(str);

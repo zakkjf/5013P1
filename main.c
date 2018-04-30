@@ -105,6 +105,13 @@ FILE *fp;
 int async_log(const char *format, ...);
 void sync_printf(const char *format, ...);
 
+/**
+​ ​*​ ​@brief​ set hardware LED on bbb
+​ ​*
+​ ​*​ ​@param led user led to set, 0-3
+ * @param setting ON or OFF
+​ ​*
+​ ​*/
 int set_led(uint8_t led, uint8_t setting)
 {
 	if(led>3)
@@ -210,7 +217,7 @@ void sync_printf(const char *format, ...)
 ​ ​*
 ​ ​*​ ​client side of Mqueue IPC
 ​ ​*
-​ ​*​ ​@param​ message message to send to server/parent
+​ ​*​ ​@param​ message message to send to logger thread
  *
 ​ ​*​ ​@return​ 0 if successful
 ​ ​*/
@@ -243,7 +250,7 @@ int async_log(const char *format, ...)
 
 
 /**
-​ ​*​ ​@brief​ serverside/parentside mQueue log thread
+​ ​*​ ​@brief​ asynchronous serverside/parentside mQueue log thread
 ​ ​*
 ​ ​*​ ​server side of Mqueue IPC
 ​ ​*
@@ -251,7 +258,6 @@ int async_log(const char *format, ...)
  *
 ​ ​*​ ​@return​ 0 if successful
 ​ ​*/
-
 void *logging_th()
 {
  	mqd_t qd_server;   // queue descriptors
@@ -294,6 +300,12 @@ void *logging_th()
     return 0;
 }
 
+/**
+​ ​*​ ​@brief​ navigational homing beacon calculation thread
+​ ​*
+​ ​*​ ​calculates distance to target, angle, aim
+​ ​*
+​ ​*/
 void *navmath_th()
 {
 	async_log("Navmath Thread: Active\n");
@@ -366,6 +378,12 @@ void *navmath_th()
 	return 0;
 }
 
+/**
+​ ​*​ ​@brief​ uart communication task thread
+​ ​*
+​ ​*​ ​calculates distance to target, angle, aim
+​ ​*
+​ ​*/
 void *uart_commtask_th(void *ptr)
 {
 
@@ -399,18 +417,30 @@ void *uart_commtask_th(void *ptr)
 #else
 		memcpy(bufmsg,tempbuf, MSG_SIZE_MAX);
 #endif
+		async_log("Received message packet from client.");
 		heartcounter++;
 		alive[0]++;
 		pthread_mutex_unlock(&buf_mutex);
 	}
 }
 
+/**
+​ ​*​ ​@brief​ tcp task would go here
+​ ​*
+​ ​*​ ​function definition for tcp receive task. Not completed.
+​ ​*
+​ ​*/
 void *tcp_commtask_th(void *ptr)
 {
 
 	return 0;
 }
 
+/**
+​ ​*​ ​@brief​ main task thread, makes sure other threads are alive, starts and ends threads.
+​ ​*
+​ ​*
+​ ​*/
 int main()
 {
 	#if LED_TEST

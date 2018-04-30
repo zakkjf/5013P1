@@ -8429,3 +8429,9 @@
 04/29/2018 21:21:03 : Navmath Thread: Active
 04/29/2018 21:21:04 : COMM ERROR: Missed heartbeat 1
 04/29/2018 21:21:05 : COMM ERROR: Missed heartbeat 1
+04/29/2018 22:01:46 : Comm Thread: Active
+04/29/2018 22:01:46 : Navmath Thread: Active
+04/29/2018 22:01:47 : COMM ERROR: Missed heartbeat 1
+04/29/2018 22:01:48 : COMM ERROR: Missed heartbeat 1
+04/29/2018 22:01:49 : COMM ERROR: Missed heartbeat 1
+04/29/2018 22:01:50 : COMM ERROR: Missed heartbeat 1

@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include <assert.h>
 
+
+/*​ ​@brief​ run distances between some test points
+​ ​*
+​ ​*​ ​@param gps a gps_raw struct of a given fix
+ * @param choice 1-no altitude in calcs 2-include altitude in  calcs
+​ ​*/
 int run_distances(gps_raw_t gps, uint8_t choice)
 {
 	if(choice>2) return 1; //not a valid choice

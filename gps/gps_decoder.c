@@ -5,6 +5,13 @@
 #include "gps_decoder.h"
 #include <stdio.h>
 
+
+/*​ ​@brief​ seperate a string using a given delimiter. From gcc. Not included in all compilers, so I included it here.
+​ ​*
+​ ​*​ ​@param stringp double pointer to a string to pass string array back out to
+ * @param delim delimiters to divide string by
+​ ​*
+​ ​*/
 char * strsep2 (char **stringp, const char *delim)
 {
     char *begin, *end;
@@ -28,6 +35,13 @@ char * strsep2 (char **stringp, const char *delim)
     return begin;
 }
 
+
+/*​ ​@brief​ divide an int value by 10 until it is less than one. Used for values right of the decimal point in parsing
+​ ​*
+​ ​*​ ​@param val value to make fractional
+ * @return float of fractional value
+​ ​*
+​ ​*/
 float make_fractional(int val)
 {
 	if(val==0) return 0;
@@ -50,6 +64,13 @@ float make_fractional(int val)
 	return flt;
 }
 
+
+/*​ ​@brief​ parse a GPGGA NMEA 0183 packed according to NMEA standards
+​ ​*
+​ ​*​ ​@param str string to parse
+ * @param gps pointer to gps struct to parse into
+​ ​* @return 0 if successful
+​ ​*/
 int split_GPGGA(char* str, gps_raw_t *gps)
 {
     char *r = strdup(str);

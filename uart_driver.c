@@ -11,6 +11,14 @@
 #define BUFHEADER '@'
 #define INITHEADER '*'
 
+/**
+​ ​*​ ​@brief​ get a line from the uart terminal and pass it into buffer
+​ ​*
+​ ​*​ ​@param buf buffer to read into
+ * @param fd uart port to read from
+ * @param buflen length of buffer writing out to
+​ ​*
+​ ​*/
 int get_uart_line(char* buf, int fd, int buflen)
 {       
         char top;
@@ -36,6 +44,14 @@ int get_uart_line(char* buf, int fd, int buflen)
         return 0;
 }
 
+/*​*
+ * ​@brief​ set up uart interface 
+​ ​*
+​ ​*​ ​@param fd uart port (ttyO1, etc)
+ * @param speed speed to use. only certain ones allowed
+ * @param parity checksum settings
+​ ​*
+​ ​*/
 int set_interface_attribs (int fd, int speed, int parity)
 {
         struct termios tty;
@@ -63,7 +79,7 @@ int set_interface_attribs (int fd, int speed, int parity)
 
         tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
                                         // enable reading
-        tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+        tty.c_cflag &= ~(PARENB | PARODD);
         tty.c_cflag |= parity;
         tty.c_cflag &= ~CSTOPB;
         tty.c_cflag &= ~CRTSCTS;
@@ -76,6 +92,12 @@ int set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
+/*​ ​@brief​ set blocking reads on a uart port
+​ ​*
+​ ​*​ ​@param fd uart port (ttyO1, etc)
+ * @param should_block whether to block on read or not
+​ ​*
+​ ​*/
 int set_blocking (int fd, int should_block)
 {
         struct termios tty;
