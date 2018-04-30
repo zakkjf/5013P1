@@ -101,6 +101,41 @@ gps_raw_t gps;
 
 FILE *fp;
 
+int async_log(const char *format, ...);
+void sync_printf(const char *format, ...);
+
+int set_led(uint8_t led, uint8_t setting)
+{
+	if(led>3)
+	{
+		return 1; //invalid led
+	}
+
+    FILE *LEDHandler=NULL;
+    char LEDPath[50];
+    sprintf(LEDPath,"/sys/class/leds/beaglebone:green:usr%d/brightness",led);
+    //sync_printf(LEDPath);
+	async_log("Setting LED to %d at %s",setting,LEDPath);
+
+   
+    if(setting == ON)
+    {
+        if((LEDHandler=fopen(LEDPath,"r+"))){
+            fwrite("1", 1, 1,LEDHandler);
+            fclose(LEDHandler);
+        }
+    }
+    else	
+    {
+	    if((LEDHandler=fopen(LEDPath,"r+"))){
+            fwrite("0", 1, 1,LEDHandler);
+            fclose(LEDHandler);
+        }
+    }
+
+    return 0;
+}
+ 
 /**
 ​ ​*​ ​@brief​ ​Synchronous logging call
 ​ ​*
@@ -377,9 +412,13 @@ void *tcp_commtask_th(void *ptr)
 
 int main()
 {
+	//turn on LED 1 for 5 seconds
+	set_led(1,ON);
+	sleep(5);
+	set_led(1,OFF);
+
 	char prev[3];
 	char consec[3];
-
 
 	consec[0] = 0;
 	consec[1] = 0;
@@ -440,10 +479,12 @@ int main()
 				{
 					async_log("It appears thread %d has frozen or crashed on task heartbeat %d",i,alive[i]);
 					sync_printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+					set_led(i,ON);
 				}
 			}
 			else
 			{
+				set_led(i,OFF);
 				consec[i] = 0;
 			}
 		}
