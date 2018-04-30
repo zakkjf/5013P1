@@ -20,15 +20,15 @@ int main(void)
     gps_test.lon_deg = 105;
     gps_test.lon_sec = 15.37717f;
     gps_test.lon_hem = 'W';
-    gps_test.fixq = 1;
+    gps_test.fixq = 3.27000;
     gps_test.sat_count = 4;
-    gps_test.hdilution = 3;
-    gps_test.altitude_m = 27;
+    gps_test.hdilution = 1618;
+    gps_test.altitude_m = 1618;
 
 	//char doo[] = "$GPGGA,223921.00,,,,,0,00,99.99,,,,,,*6F"; // a time-only fix. Will be interpreted as 0,0
 
     //char doo[] = "$GPGGA,022458.233,3854.932,N,07902.500,W,1,08,44,890,M,3900,M,,*51"; //somewhere in the middle of BFE West Virginia
-    char doo[] = "$GPGGA,042655.00,4000.27270,N,10515.37717,W,1,04,3.27,1618.7,M,-21.3,M,,*51"; //roughly the office of my apartment complex
+    char doo[] = "$GPGGA,042655.00,4000.27270,N,10515.37717,W,1,04,3.27,1618,1618,1618,-21.3,M,,*51"; //roughly the office of my apartment complex
     split_GPGGA(doo,&gps);
     
     printf("NMEA PARSER UNIT TESTS:\n");
@@ -51,11 +51,12 @@ int main(void)
     printf("lon dd %f\n",gps.lon_dec_deg);
     printf("lat %d deg %f' %c\n",gps.lat_deg,gps.lat_sec,gps.lat_hem);
     printf("lon %d deg %f' %c\n",gps.lon_deg,gps.lon_sec,gps.lon_hem);
-    printf("fixq %d\n",gps.fixq);
+    printf("fixq %f\n",gps.fixq);
     printf("sat %d\n",gps.sat_count);
     printf("h %d\n",gps.hdilution);
     printf("alt %d\n",gps.altitude_m);
 
+    printf("REASONABLE VALUE TESTS:");
     run_distances(gps,2);
     return 0;
 }
