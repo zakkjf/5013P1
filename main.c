@@ -52,6 +52,7 @@
 
 #define DEBUG ON
 #define HEARTBEAT_TEST OFF
+#define LED_TEST OFF
 #define THREAD_TIMEOUT_TEST OFF
 #define LOGPATH "log.txt"
 
@@ -412,10 +413,12 @@ void *tcp_commtask_th(void *ptr)
 
 int main()
 {
-	//turn on LED 1 for 5 seconds
+	#if LED_TEST
+	//turn on LED 1 for 1 seconds
 	set_led(1,ON);
-	sleep(5);
+	sleep(1);
 	set_led(1,OFF);
+	#endif
 
 	char prev[3];
 	char consec[3];

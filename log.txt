@@ -8322,3 +8322,110 @@
 04/29/2018 20:20:30 : Heading to the APES lecture hall 193.917862 degrees CW of N
 04/29/2018 20:20:30 : Pointing within 167.979324 degrees of target04/29/2018 20:20:30 : Current time: 03:59:07
 04/29/2018 20:20:30 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:45:17 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:17 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:17 : Comm Thread: Active
+04/29/2018 20:45:17 : Navmath Thread: Active
+04/29/2018 20:45:18 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:19 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:20 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:21 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:22 : Task 0 taking longer than expected, run 1, 0 consec04/29/2018 20:45:22 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:22 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:22 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:23 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:24 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:25 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:26 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:27 : Task 0 taking longer than expected, run 2, 1 consec04/29/2018 20:45:27 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:27 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:27 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:28 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:29 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:30 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:31 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:32 : Task 0 taking longer than expected, run 3, 2 consec04/29/2018 20:45:32 : It appears thread 0 has frozen or crashed on task heartbeat 404/29/2018 20:45:32 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:45:32 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:32 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:32 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:33 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:34 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:35 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:36 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:37 : Task 0 taking longer than expected, run 4, 3 consec04/29/2018 20:45:37 : It appears thread 0 has frozen or crashed on task heartbeat 504/29/2018 20:45:37 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:45:37 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:37 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:37 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:38 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:39 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:40 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:41 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:42 : Task 0 taking longer than expected, run 5, 4 consec04/29/2018 20:45:42 : It appears thread 0 has frozen or crashed on task heartbeat 604/29/2018 20:45:42 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:45:42 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:42 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:42 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:43 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:44 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:45 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:46 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:47 : Task 0 taking longer than expected, run 6, 5 consec04/29/2018 20:45:47 : It appears thread 0 has frozen or crashed on task heartbeat 704/29/2018 20:45:47 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:45:47 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:45:47 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:45:47 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:48 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:49 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:50 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:45:51 : COMM ERROR: Missed heartbeat 1
+04/29/2018 20:46:09 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:46:09 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:46:09 : Navmath Thread: Active
+04/29/2018 20:46:09 : Comm Thread: Active
+04/29/2018 20:46:10 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:10 : Fix Quality: 9.850000
+04/29/2018 20:46:10 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:10 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:10 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:10 : Pointing within 156.467087 degrees of target04/29/2018 20:46:10 : Current time: 03:59:07
+04/29/2018 20:46:10 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:11 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:11 : Fix Quality: 9.850000
+04/29/2018 20:46:11 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:11 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:11 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:11 : Pointing within 167.979324 degrees of target04/29/2018 20:46:11 : Current time: 03:59:07
+04/29/2018 20:46:11 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:12 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:12 : Fix Quality: 9.850000
+04/29/2018 20:46:12 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:12 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:12 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:12 : Pointing within 167.979324 degrees of target04/29/2018 20:46:12 : Current time: 03:59:07
+04/29/2018 20:46:12 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:13 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:13 : Fix Quality: 9.850000
+04/29/2018 20:46:13 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:13 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:13 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:13 : Pointing within 167.979324 degrees of target04/29/2018 20:46:13 : Current time: 03:59:07
+04/29/2018 20:46:13 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:14 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:46:14 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:46:14 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:46:14 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:14 : Fix Quality: 9.850000
+04/29/2018 20:46:14 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:14 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:14 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:14 : Pointing within 167.979324 degrees of target04/29/2018 20:46:14 : Current time: 03:59:07
+04/29/2018 20:46:14 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:15 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:15 : Fix Quality: 9.850000
+04/29/2018 20:46:15 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:15 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:15 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:15 : Pointing within 167.979324 degrees of target04/29/2018 20:46:15 : Current time: 03:59:07
+04/29/2018 20:46:15 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:16 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:16 : Fix Quality: 9.850000
+04/29/2018 20:46:16 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:16 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:16 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:16 : Pointing within 167.979324 degrees of target04/29/2018 20:46:16 : Current time: 03:59:07
+04/29/2018 20:46:16 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:17 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:17 : Fix Quality: 9.850000
+04/29/2018 20:46:17 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:17 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:17 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:17 : Pointing within 167.979324 degrees of target04/29/2018 20:46:17 : Current time: 03:59:07
+04/29/2018 20:46:17 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:18 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:18 : Fix Quality: 9.850000
+04/29/2018 20:46:18 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:18 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:18 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:18 : Pointing within 167.979324 degrees of target04/29/2018 20:46:18 : Current time: 03:59:07
+04/29/2018 20:46:18 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 20:46:19 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr0/bright04/29/2018 20:46:19 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 20:46:19 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr2/bright04/29/2018 20:46:19 : Board Type: TIVA ID: 1 Firmware version: 1.
+04/29/2018 20:46:19 : Fix Quality: 9.850000
+04/29/2018 20:46:19 : Distance to the APES lecture hall 30.451908 meters
+04/29/2018 20:46:19 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr3/bright04/29/2018 20:46:19 : Heading to the APES lecture hall 193.917862 degrees CW of N
+04/29/2018 20:46:19 : Pointing within 167.979324 degrees of target04/29/2018 20:46:19 : Current time: 03:59:07
+04/29/2018 20:46:19 : FIX LIKELY: GPS antenna is pointing above the horizon.
+04/29/2018 21:19:57 : Setting LED to 1 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 21:19:57 : Setting LED to 0 at /sys/class/leds/beaglebone:green:usr1/bright04/29/2018 21:19:57 : Comm Thread: Active
+04/29/2018 21:19:57 : Navmath Thread: Active
+04/29/2018 21:19:58 : COMM ERROR: Missed heartbeat 1
+04/29/2018 21:19:59 : COMM ERROR: Missed heartbeat 1
+04/29/2018 21:20:00 : COMM ERROR: Missed heartbeat 1
+04/29/2018 21:21:03 : Comm Thread: Active
+04/29/2018 21:21:03 : Navmath Thread: Active
+04/29/2018 21:21:04 : COMM ERROR: Missed heartbeat 1
+04/29/2018 21:21:05 : COMM ERROR: Missed heartbeat 1
